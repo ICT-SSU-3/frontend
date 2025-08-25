@@ -4,6 +4,7 @@ import Modal from './Modal';
 import { InputWrapper, StyledInput, Icon } from './Input';
 import { StyledButton } from './Button';
 import Select, { type SingleValue } from 'react-select';
+import { maskResume } from '../../api/resume'; // API 함수 임포트
 
 const Title = styled.h3`
   font-size: 20px; font-weight: bold; margin-bottom: 30px; text-align: center;
@@ -35,6 +36,7 @@ interface InterviewInfoModalProps {
     companyName: string;
     jobTitle: string;
     pdfFile: File | null;
+    maskedText?: string;
   }) => void;
 }
 
@@ -57,6 +59,30 @@ const jobOptions: JobOption[] = [
   { value: 'wasl_search_recommendation', label: 'WASL Search/Recommendation Engineer' },
 ];
 
+const MaskedTextDisplay = styled.pre`
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  white-space: pre-wrap;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  max-height: 200px;
+  overflow-y: auto;
+`;
+
+const ErrorDisplay = styled.div`
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: bold;
+`;
+
 const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
   isOpen,
   onClose,
@@ -66,6 +92,9 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
   const [userName, setUserName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [jobTitle, setJobTitle] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [maskedText, setMaskedText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const isFormValid = Boolean(pdfFile && userName && companyName && jobTitle);
 
@@ -74,6 +103,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
       const file = e.target.files[0];
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         setPdfFile(file);
+        setError(null);
       } else {
         alert('PDF 파일만 업로드 가능합니다.');
         e.target.value = '';
@@ -81,15 +111,30 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
     }
   };
 
-  const handleStart = () => {
-    if (!isFormValid) return;
-    onStartInterview({ 
-      pdfFile, 
-      userName, 
-      companyName, 
-      jobTitle: String(jobTitle),
-     });
-    onClose();
+  const handleStart = async () => {
+    if (!isFormValid || !pdfFile) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await maskResume(pdfFile, userName);
+      console.log("마스킹 성공:", data);
+      setMaskedText(data.masked_text);
+      // onStartInterview({ 
+      //   pdfFile, 
+      //   userName, 
+      //   companyName, 
+      //   jobTitle: String(jobTitle),
+      //   maskedText: data.masked_text,
+      // });
+      // onClose();
+    } catch (err) {
+      console.error('API 통신 중 오류 발생:', err);
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleJobChange = (opt: SingleValue<JobOption>) => {
@@ -136,9 +181,21 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
           onChange={handleJobChange} 
         />
       </DropdownWrapper>
-      <StyledButton primary onClick={handleStart} disabled={!isFormValid}>
-        면접 생성
+      <StyledButton primary onClick={handleStart} disabled={!isFormValid || loading}>
+        {loading ? '처리 중...' : '면접 생성'}
       </StyledButton>
+      
+      {error && (
+        <ErrorDisplay>
+          {error}
+        </ErrorDisplay>
+      )}
+
+      {maskedText && (
+        <MaskedTextDisplay>
+          {maskedText}
+        </MaskedTextDisplay>
+      )}
     </Modal>
   );
 };
