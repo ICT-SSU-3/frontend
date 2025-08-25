@@ -3,9 +3,8 @@ import styled from 'styled-components';
 import Modal from './Modal';
 import { InputWrapper, StyledInput, Icon } from './Input';
 import { StyledButton } from './Button';
-import Select, { type SingleValue } from 'react-select';
 import { maskResume } from '../../api/resume';
-// import { generateQuestion } from '../../api/question'; // 질문 생성 API는 주석 처리
+// import { generateQuestion } from '../../api/question';
 
 const Title = styled.h3`
   font-size: 20px; font-weight: bold; margin-bottom: 30px; text-align: center;
@@ -17,17 +16,6 @@ const FileInputLabel = styled.label`
 `;
 const FileInput = styled.input` display: none; `;
 const DropdownWrapper = styled.div` margin-bottom: 20px; `;
-
-const customStyles = {
-  control: (provided: any) => ({
-    ...provided,
-    backgroundColor: '#f7f7f7',
-    border: 'none',
-    boxShadow: 'none',
-    padding: '4px',
-    borderRadius: '8px',
-  }),
-};
 
 interface InterviewInfoModalProps {
   isOpen: boolean;
@@ -41,25 +29,6 @@ interface InterviewInfoModalProps {
     initialQuestion: string;
   }) => void;
 }
-
-type JobOption = { value: string; label: string };
-const jobOptions: JobOption[] = [
-  { value: 'security_development', label: 'Security Development' },
-  { value: 'naver_app_android', label: '네이버 앱 Android' },
-  { value: 'naver_app_ios', label: '네이버 앱 iOS' },
-  { value: 'pwe_app_android', label: 'PWE 앱 Android' },
-  { value: 'pwe_app_ios', label: 'PWE 앱 iOS' },
-  { value: 'works_mobile_app_ios', label: 'WORKS MOBILE APP iOS' },
-  { value: 'smartstudio_frontend', label: 'SMARTSTUDIO Front-end' },
-  { value: 'smartstudio_backend', label: 'SMARTSTUDIO Back-end' },
-  { value: 'smartstudio_android', label: 'SMARTSTUDIO Android' },
-  { value: 'smartstudio_ios', label: 'SMARTSTUDIO iOS' },
-  { value: 'wasl_backend', label: 'WASL Back-end' },
-  { value: 'wasl_android', label: 'WASL Android' },
-  { value: 'wasl_ios', label: 'WASL iOS' },
-  { value: 'wasl_frontend', label: 'WASL Front-end' },
-  { value: 'wasl_search_recommendation', label: 'WASL Search/Recommendation Engineer' },
-];
 
 const MaskedTextDisplay = styled.pre`
   background-color: #f3f4f6;
@@ -156,7 +125,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         initialQuestion: initialQuestion,
       });
 
-      onClose(); // 이제 챗봇 화면으로 이동하므로 모달을 닫습니다.
+      onClose();
 
     } catch (err) {
       console.error('API 통신 중 오류 발생:', err);
@@ -164,10 +133,6 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleJobChange = (opt: SingleValue<JobOption>) => {
-    setJobTitle(opt?.label ?? '');
   };
 
   return (
@@ -201,15 +166,14 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
           onChange={(e) => setCompanyName(e.target.value)}
         />
       </InputWrapper>
-      <DropdownWrapper>
-        <Select
-          options={jobOptions}
-          placeholder="직무를 선택하세요"
-          styles={customStyles as any}
-          value ={jobOptions.find(o => o.label === jobTitle) ?? null}
-          onChange={handleJobChange} 
+      <InputWrapper>
+        <Icon>💼</Icon>
+        <StyledInput
+          placeholder="직무를 입력해주세요."
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
         />
-      </DropdownWrapper>
+      </InputWrapper>
       <StyledButton primary onClick={handleStart} disabled={!isFormValid || loading}>
         {loading ? '처리 중...' : '면접 생성'}
       </StyledButton>
@@ -219,9 +183,6 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
           {error}
         </ErrorDisplay>
       )}
-
-      {/* 마스킹된 텍스트와 초기 질문은 이제 화면에 표시하지 않습니다. */}
-      {/* 챗봇 화면으로 이동하므로 관련 로직 제거 */}
     </Modal>
   );
 };
