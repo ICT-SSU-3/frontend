@@ -1,11 +1,10 @@
-// src/components/chat/Chatbot.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, type ComponentType } from 'react';
 import styled from 'styled-components';
-import { InputWrapper, StyledTextarea } from '../common/Input';
-import { type ComponentType } from 'react';
 import { FaMicrophone as FaMicrophoneRaw, FaPaperPlane as FaPaperPlaneRaw } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { StyledButton } from '../common/Button';
+import { InputWrapper, StyledTextarea } from '../common/Input';
+import { recognizeSpeech } from '../../api/stt'; // STT API 함수 임포트
 
 const FaMicrophone = FaMicrophoneRaw as ComponentType;
 const FaPaperPlane = FaPaperPlaneRaw as ComponentType;
@@ -85,10 +84,13 @@ const ChatInputContainer = styled.div`
   transition: border-color .2s ease, box-shadow .2s ease;
 `;
 
-const StyledIcon = styled.button`
+const StyledIcon = styled.button<{ isRecording?: boolean }>`
   background: none; border: none; cursor: pointer; font-size: 20px;
   color: #555; padding: 0;
   &:hover { color: #000; }
+  ${({ isRecording }) => isRecording && `
+    color: red;
+  `}
 `;
 
 interface ChatbotProps { 
@@ -100,12 +102,15 @@ interface ChatbotProps {
 interface Message { text: string; isUser: boolean; }
 
 const Chatbot: React.FC<ChatbotProps> = ({ initialMessage, companyName, jobTitle }) => {
-  const navigate = useNavigate(); // leaderboard page 이동
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([{ text: initialMessage, isUser: false }]);
   const [inputValue, setInputValue] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const messageListRef = useRef<HTMLDivElement>(null);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => {
     if (!textareaRef.current) return;
     const el = textareaRef.current;
@@ -124,6 +129,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ initialMessage, companyName, jobTitle
       const newUserMessage: Message = { text: inputValue, isUser: true };
       setMessages((prev) => [...prev, newUserMessage]);
       setInputValue('');
+      // TODO: 백엔드 API 호출 로직 추가
     }
   };
 
@@ -131,6 +137,42 @@ const Chatbot: React.FC<ChatbotProps> = ({ initialMessage, companyName, jobTitle
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleSpeechRecognition = async () => {
+    if (isRecording) {
+      // 녹음 중이면 녹음 종료
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+    } else {
+      // 녹음 시작
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          try {
+            const result = await recognizeSpeech(audioBlob);
+            setInputValue(result.transcript);
+          } catch (error) {
+            console.error('STT API 오류:', error);
+            alert('음성 인식 중 오류가 발생했습니다.');
+          }
+        };
+
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error('음성 녹음 권한 오류:', err);
+        alert('마이크 접근 권한이 필요합니다.');
+      }
     }
   };
 
@@ -160,7 +202,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ initialMessage, companyName, jobTitle
       <DividerBottom />
 
       <ChatInputContainer>
-        <StyledIcon><FaMicrophone /></StyledIcon>
+        <StyledIcon isRecording={isRecording} onClick={handleSpeechRecognition}>
+          <FaMicrophone />
+        </StyledIcon>
         <InputWrapper style={{ flexGrow: 1, marginBottom: 0, alignItems: 'stretch' }}>
           <StyledTextarea
             ref={textareaRef}
