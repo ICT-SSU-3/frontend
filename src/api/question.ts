@@ -13,7 +13,6 @@ export const generateQuestion = async (company: string, role: string, resume: st
     throw new Error('API Base URL is not defined in environment variables.');
   }
 
-  // 정확한 엔드포인트로 URL 수정
   const response = await fetch(`${API_BASE_URL}/api/question/generate`, {
     method: 'POST',
     headers: {
@@ -36,4 +35,3 @@ export const generateQuestion = async (company: string, role: string, resume: st
 
   return data as QuestionResponse;
 };
-

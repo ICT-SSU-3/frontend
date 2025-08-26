@@ -21,7 +21,6 @@
     margin-bottom: 40px;
   `;
 
-  // 로그인버튼 재정의
   const LoginButton = styled.button`
     width: 40%;
     padding: 10px; 
@@ -39,7 +38,6 @@
     }
   `;
 
-  // 회원가입버튼 재정의
   const SignupButton = styled.button`
     width: 40%;
     padding: 10px;

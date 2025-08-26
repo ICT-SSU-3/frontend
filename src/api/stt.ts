@@ -17,7 +17,7 @@ export const recognizeSpeech = async (file: Blob, language: string = 'ko-KR'): P
   }
 
   const formData = new FormData();
-  formData.append('file', file, 'audio.webm'); // 파일명은 임의로 지정
+  formData.append('file', file, 'audio.webm'); // 임의의 파일명
   formData.append('language', language);
 
   const response = await fetch(`${API_BASE_URL}/api/stt/google/recognize`, {

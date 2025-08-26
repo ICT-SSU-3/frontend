@@ -1,11 +1,9 @@
-// src/components/common/InterviewInfoModal.tsx
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import Modal from './Modal';
 import { InputWrapper, StyledInput, Icon } from './Input';
 import { StyledButton } from './Button';
 import { maskResume } from '../../api/resume';
-// import { generateQuestion } from '../../api/question';
 
 const Title = styled.h3`
   font-size: 20px; font-weight: bold; margin-bottom: 30px; text-align: center;
@@ -26,7 +24,7 @@ interface InterviewInfoModalProps {
     companyName: string;
     jobTitle: string;
     pdfFile: File | null;
-    maskedText: string;          // ★ 필수 전달
+    maskedText: string;
     initialQuestion: string;
   }) => void;
 }
@@ -108,7 +106,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
       const resumeText = maskingData.masked_text;
       setMaskedText(resumeText);
 
-      // 질문 생성 API(보류) 대신 고정 멘트 사용
+      //initial question
       const iq = `${companyName}의 ${jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`;
       setInitialQuestion(iq);
 
@@ -117,7 +115,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         userName,
         companyName,
         jobTitle,
-        maskedText: resumeText,   // ★ MainView로 전달
+        maskedText: resumeText,
         initialQuestion: iq,
       });
 
@@ -175,7 +173,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
 
       {error && <ErrorDisplay>{error}</ErrorDisplay>}
 
-      {/* 선택: 마스킹 결과 미리보기 */}
+      
       {maskedText && (
         <>
           <h4 style={{ marginTop: 16 }}>마스킹 텍스트(요약):</h4>
@@ -183,7 +181,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         </>
       )}
 
-      {/* 선택: 초기 멘트 미리보기 */}
+      
       {initialQuestion && (
         <QuestionDisplay>{initialQuestion}</QuestionDisplay>
       )}

@@ -1,4 +1,3 @@
-// src/pages/Leaderboard.tsx
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useLocation } from 'react-router-dom';
@@ -44,7 +43,7 @@ const Monos = styled.pre`
   padding: 10px; border-radius: 8px; color: #334155; max-height: 200px; overflow: auto;
 `;
 
-// 개별 컴포넌트
+
 const Question: React.FC<{ number: number; text: string }> = ({ number, text }) => (
   <div style={{ flex: 1, minWidth: 0 }}>
     <div style={{ fontWeight: 700, marginBottom: 6 }}>Q{number}.</div>
@@ -143,7 +142,6 @@ const Leaderboard: React.FC = () => {
         </ScrollArea>
       )}
 
-      {/* 옵션: 원시 로그를 아래에 노출해 디버깅 용이 */}
       <div style={{ marginTop: 20, textAlign: 'left' }}>
         <h4 style={{ margin: '10px 0' }}>Raw interview_log (debug)</h4>
         <Monos>{JSON.stringify(rows, null, 2)}</Monos>

@@ -1,9 +1,8 @@
-// src/components/main/MainView.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { StyledButton } from '../common/Button';
 import Chatbot from '../chat/Chatbot';
-import { InterviewAPI } from '../../api'; // ✅ API 사용
+import { InterviewAPI } from '../../api';
 
 const PageContainer = styled.div`
   display: flex;
@@ -111,7 +110,7 @@ const EmptyNotice = styled.div`
   text-align: center;
 `;
 
-// ★ interviewData에 maskedText 추가
+
 interface MainViewProps {
   onNewInterviewClick: () => void;
   onLoginClick: () => void;
@@ -119,7 +118,7 @@ interface MainViewProps {
     userName: string;
     companyName: string;
     jobTitle: string;
-    maskedText?: string;      // ★ 추가
+    maskedText?: string;  //자소서 마스킹
     pdfFile?: File | null;
   } | null;
 }
@@ -130,8 +129,8 @@ type Session = {
   jobTitle: string;
   createdAt: number;
   userName: string;
-  maskedText?: string;     // ★ 추가
-  sessionId?: string;      // start_interview 결과
+  maskedText?: string;   
+  sessionId?: string;      // start_interview로 받은 세션 id
 };
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -174,27 +173,25 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
           company: activeSession.companyName,
           role: activeSession.jobTitle,
           user_name: activeSession.userName,
-          resume_masked_text: activeSession.maskedText, // ★ 선택 전달
+          resume_masked_text: activeSession.maskedText,
         });
         setSessions(prev =>
           prev.map(x => (x.id === activeSession.id ? { ...x, sessionId: session_id } : x))
         );
       } catch (e) {
         console.error('start_interview 실패:', e);
-        // 실패해도 UI는 유지. Chatbot 디버그에 표시됨.
       }
     })();
-  }, [activeSession?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [activeSession?.id]);
   const sessionsForView = useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
     [sessions]
   );
 
-  // ★ 초기 멘트: 문구 오타 수정(불필요한 id 제거)
+  
   const initialMessage =
     activeSession
-      ? `${activeSession.companyName}의 ${activeSession.jobTitle}에 ${activeSession.id}대한${activeId} 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`
+      ? `${activeSession.companyName}의 ${activeSession.jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`
       : '';
 
   return (
@@ -243,7 +240,6 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
 
       <Content>
         {activeSession ? (
-          // ★ Chatbot prop 형태 변경: ctx로 전달
           <Chatbot
             initialMessage={initialMessage}
             ctx={{

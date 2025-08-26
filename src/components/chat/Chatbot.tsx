@@ -1,4 +1,3 @@
-// src/components/chat/Chatbot.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { InputWrapper, StyledTextarea } from '../common/Input';
@@ -13,7 +12,6 @@ import { InterviewAPI } from '../../api';
 const FaMicrophone = FaMicrophoneRaw as ComponentType;
 const FaPaperPlane = FaPaperPlaneRaw as ComponentType;
 
-/* ---------- styles ---------- */
 const ChatContainer = styled.div`
   display: flex; flex-direction: column;
   height: 100%; width: 100%;
@@ -66,7 +64,7 @@ const DebugBox = styled.pre`
   font-size: 12px; color: #334155; max-height: 220px; overflow: auto; margin: 4px 0 0 0;
 `;
 
-/* ---------- 더미 질문: 네이버 데이터 분석 ---------- */
+// 더미 질문 -> 추후 질문 생성 api로 수정 필요
 const dummyQuestions = [
   '네이버에서 데이터 분석가로 일하며 가장 중요하다고 생각하는 역량은 무엇인가요?',
   '데이터 기반 의사결정으로 성과를 개선했던 경험을 구체적으로 설명해주세요.',
@@ -75,11 +73,9 @@ const dummyQuestions = [
 ];
 
 interface ChatbotProps {
-  /** 첫 안내 멘트 (회사/직무 포함) */
   initialMessage: string;
-  /** 반드시 start_interview로 받은 sessionId 사용 */
   ctx: {
-    sessionId?: string;           // 없으면 아직 발급 전
+    sessionId?: string;           // start_interview 세션ID 
     companyName: string;
     jobTitle: string;
     userName: string;
@@ -90,7 +86,8 @@ interface Message { text: string; isUser: boolean; }
 
 export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const navigate = useNavigate();
-  // 마스킹 원문
+
+  // 자소서 마스킹 데이터 출력
   const [messages, setMessages] = useState<Message[]>([
     { text: initialMessage, isUser: false },
   ]);
@@ -99,21 +96,17 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-// ★ 추가: 마스킹 원문을 한 번만 올리기 위한 가드
+// 자소서 가드 -> 1500자만 보여줌
   const postedMaskedRef = useRef(false);
-
-// ★ 추가: 너무 긴 텍스트는 앞부분만 보여주고 생략 표시
-  const MAX_MASKED_CHARS = 1500; // 필요시 조절
+  const MAX_MASKED_CHARS = 1500; 
 
   useEffect(() => {
-    // 초기 진입/세션 변경 시, maskedText가 있으면 안내 멘트 다음에 한번만 출력
     if (postedMaskedRef.current) return;
     const full = (ctx.maskedText || '').trim();
     if (!full) return;
 
     postedMaskedRef.current = true;
 
-    // 앞부분만 잘라서 전송 (남은 길이 안내)
     const sliced = full.slice(0, MAX_MASKED_CHARS);
     const omitted = full.length - sliced.length;
 
@@ -122,27 +115,26 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
 
     setMessages(prev => [
       ...prev,
-      { text: header + sliced + tail, isUser: false }, // ★ 여기서 채팅에 바로 노출
+      { text: header + sliced + tail, isUser: false }, // 자소서 마스킹 데이터 호출
     ]);
   }, [ctx.maskedText]);
 
-  // 질문 인덱스: -1 = 자기소개 단계 → 답변 오면 0번 질문 시작
+  // 질문 인덱스 -> 자기소개 답변 오면 질문 생성
   const [currentIdx, setCurrentIdx] = useState<number>(-1);
   const [questionStartAt, setQuestionStartAt] = useState<number | null>(null);
 
-  // 세션/평가/에러/요청·응답 디버깅
+  // 디버깅
   const [sessionId, setSessionId] = useState<string | undefined>(ctx.sessionId);
   const [lastEval, setLastEval] = useState<string>('');
   const [lastError, setLastError] = useState<string>('');
   const [lastRequest, setLastRequest] = useState<any>(null);   // ★ 디버그용
   const [lastResponse, setLastResponse] = useState<any>(null); // ★ 디버그용
 
-  // ctx.sessionId가 늦게 도착할 수 있으므로 싱크
   useEffect(() => {
     if (ctx.sessionId && ctx.sessionId !== sessionId) setSessionId(ctx.sessionId);
   }, [ctx.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // textarea 자동 높이
+  // textarea 높이 설정
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -151,7 +143,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [inputValue]);
 
-  // 자동 스크롤
+  // 스크롤
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (listRef.current) {
@@ -190,7 +182,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       return;
     }
 
-    // 평가 호출 (세션이 꼭 있어야 함) — 없으면 스킵하고 디버깅 표기
+    // 평가 api 호출 
     if (!sessionId) {
       setLastError('세션이 아직 준비되지 않아 evaluate를 생략했습니다.');
       askNext(currentIdx + 1);
@@ -209,16 +201,15 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
         answer: text,
         time_in_seconds: sec,
       };
-      setLastRequest({ type: 'evaluate_answer', payload: reqPayload }); // ★ 디버그 저장
+      setLastRequest({ type: 'evaluate_answer', payload: reqPayload });
 
       const res = await InterviewAPI.evaluate(reqPayload);
-      setLastResponse({ type: 'evaluate_answer', result: res });       // ★ 디버그 저장
+      setLastResponse({ type: 'evaluate_answer', result: res });
 
       const { report_for_current_answer } = res;
       setLastEval(report_for_current_answer);
       sendBot(`평가 요약: ${report_for_current_answer}`);
 
-      // 다음 질문
       askNext(currentIdx + 1);
     } catch (e: any) {
       setLastError(String(e?.message || e));
@@ -234,7 +225,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
-  // 면접 종료 → end_interview → 리더보드 페이지로 이동(+로그 전달)
+  // 면접 종료 -> 리더보드 페이지로 이동
   const onEndInterview = async () => {
     try {
       if (!sessionId) {
@@ -247,10 +238,10 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
         return;
       }
       const reqPayload = { session_id: sessionId };
-      setLastRequest({ type: 'end_interview', payload: reqPayload }); // ★ 디버그 저장
+      setLastRequest({ type: 'end_interview', payload: reqPayload });
 
       const data = await InterviewAPI.end(reqPayload);
-      setLastResponse({ type: 'end_interview', result: data });       // ★ 디버그 저장
+      setLastResponse({ type: 'end_interview', result: data });
 
       navigate('/leaderboard', { state: {
         ...data,
@@ -267,9 +258,9 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       } });
     }
   };
+  // 답변 녹음
   const handleSpeechRecognition = async () => {
     if (isRecording) {
-      // 녹음 중이면 녹음 종료
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
     } else {
@@ -310,7 +301,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
           <MessageBubble key={i} isUser={m.isUser}>{m.text}</MessageBubble>
         ))}
 
-        {/* ⭐ 디버그 패널: 세션/현재 질문/평가/에러/마지막 요청·응답 */}
+        {/* 디버그  */}
         <DebugBox>
           {JSON.stringify({
             sessionId: sessionId ?? '(pending)',
@@ -323,7 +314,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
           }, null, 2)}
         </DebugBox>
 
-        {/* 항상 하단에 보이는 종료 버튼 */}
+        {/* 종료 버튼 */}
         <EndButtonWrap>
           <EndButton primary onClick={onEndInterview}>면접 종료하기</EndButton>
         </EndButtonWrap>
