@@ -1,3 +1,4 @@
+// src/components/common/InterviewInfoModal.tsx
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import Modal from './Modal';
@@ -25,7 +26,7 @@ interface InterviewInfoModalProps {
     companyName: string;
     jobTitle: string;
     pdfFile: File | null;
-    maskedText: string;
+    maskedText: string;          // ★ 필수 전달
     initialQuestion: string;
   }) => void;
 }
@@ -107,26 +108,20 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
       const resumeText = maskingData.masked_text;
       setMaskedText(resumeText);
 
-      // 질문 생성 API 호출 부분을 주석 처리합니다.
-      // const questionData = await generateQuestion(companyName, jobTitle, resumeText);
-      // const initialQuestion = questionData.question;
-      
-      const initialQuestion = `${companyName}의 ${jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`;
-      setInitialQuestion(initialQuestion);
-      
-      console.log("초기 질문 생성 성공 (임시):", initialQuestion);
+      // 질문 생성 API(보류) 대신 고정 멘트 사용
+      const iq = `${companyName}의 ${jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`;
+      setInitialQuestion(iq);
 
-      onStartInterview({ 
-        pdfFile, 
-        userName, 
-        companyName, 
-        jobTitle: jobTitle,
-        maskedText: resumeText,
-        initialQuestion: initialQuestion,
+      onStartInterview({
+        pdfFile,
+        userName,
+        companyName,
+        jobTitle,
+        maskedText: resumeText,   // ★ MainView로 전달
+        initialQuestion: iq,
       });
 
       onClose();
-
     } catch (err) {
       console.error('API 통신 중 오류 발생:', err);
       setError((err as Error).message);
@@ -177,11 +172,20 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
       <StyledButton primary onClick={handleStart} disabled={!isFormValid || loading}>
         {loading ? '처리 중...' : '면접 생성'}
       </StyledButton>
-      
-      {error && (
-        <ErrorDisplay>
-          {error}
-        </ErrorDisplay>
+
+      {error && <ErrorDisplay>{error}</ErrorDisplay>}
+
+      {/* 선택: 마스킹 결과 미리보기 */}
+      {maskedText && (
+        <>
+          <h4 style={{ marginTop: 16 }}>마스킹 텍스트(요약):</h4>
+          <MaskedTextDisplay>{maskedText.slice(0, 1200)}</MaskedTextDisplay>
+        </>
+      )}
+
+      {/* 선택: 초기 멘트 미리보기 */}
+      {initialQuestion && (
+        <QuestionDisplay>{initialQuestion}</QuestionDisplay>
       )}
     </Modal>
   );

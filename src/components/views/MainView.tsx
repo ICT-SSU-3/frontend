@@ -1,7 +1,9 @@
+// src/components/main/MainView.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { StyledButton } from '../common/Button';
 import Chatbot from '../chat/Chatbot';
+import { InterviewAPI } from '../../api'; // ✅ API 사용
 
 const PageContainer = styled.div`
   display: flex;
@@ -109,6 +111,7 @@ const EmptyNotice = styled.div`
   text-align: center;
 `;
 
+// ★ interviewData에 maskedText 추가
 interface MainViewProps {
   onNewInterviewClick: () => void;
   onLoginClick: () => void;
@@ -116,6 +119,7 @@ interface MainViewProps {
     userName: string;
     companyName: string;
     jobTitle: string;
+    maskedText?: string;      // ★ 추가
     pdfFile?: File | null;
   } | null;
 }
@@ -125,6 +129,9 @@ type Session = {
   companyName: string;
   jobTitle: string;
   createdAt: number;
+  userName: string;
+  maskedText?: string;     // ★ 추가
+  sessionId?: string;      // start_interview 결과
 };
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -137,35 +144,58 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
   // 새 면접이 들어오면 최신을 위로 추가
   useEffect(() => {
     if (!interviewData) return;
-    const key = `${interviewData.companyName}|${interviewData.jobTitle}`;
+    const key = `${interviewData.companyName}|${interviewData.jobTitle}|${interviewData.userName}`;
     if (lastAddedKey.current === key) return;
 
     const s: Session = {
       id: uid(),
       companyName: String(interviewData.companyName ?? ''),
       jobTitle: String(interviewData.jobTitle ?? ''),
+      userName: String(interviewData.userName ?? ''),
+      maskedText: interviewData.maskedText, // ★ 저장
       createdAt: Date.now(),
     };
-    setSessions(prev => [s, ...prev]); // 시간 순으로 정렬
+    setSessions(prev => [s, ...prev]); // 최신 위
     setActiveId(s.id);
     lastAddedKey.current = key;
   }, [interviewData]);
-
-  const sessionsForView = useMemo(
-    () => [...sessions].sort((a, b) => b.createdAt - a.createdAt), // 최신 위 / 과거 아래
-    [sessions]
-  );
 
   const activeSession = useMemo(
     () => sessions.find(s => s.id === activeId) ?? null,
     [sessions, activeId]
   );
 
-  const initialMessage = activeSession
-    ? `${activeSession.companyName}의 ${activeSession.jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`
-    : '';
+  // ⭐ 면접 생성 시 서버로 start_interview 호출 → session_id 보관
+  useEffect(() => {
+    if (!activeSession || activeSession.sessionId) return;
+    (async () => {
+      try {
+        const { session_id } = await InterviewAPI.start({
+          company: activeSession.companyName,
+          role: activeSession.jobTitle,
+          user_name: activeSession.userName,
+          resume_masked_text: activeSession.maskedText, // ★ 선택 전달
+        });
+        setSessions(prev =>
+          prev.map(x => (x.id === activeSession.id ? { ...x, sessionId: session_id } : x))
+        );
+      } catch (e) {
+        console.error('start_interview 실패:', e);
+        // 실패해도 UI는 유지. Chatbot 디버그에 표시됨.
+      }
+    })();
+  }, [activeSession?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sessionsForView = useMemo(
+    () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
+    [sessions]
+  );
 
+  // ★ 초기 멘트: 문구 오타 수정(불필요한 id 제거)
+  const initialMessage =
+    activeSession
+      ? `${activeSession.companyName}의 ${activeSession.jobTitle}에 ${activeSession.id}대한${activeId} 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`
+      : '';
 
   return (
     <PageContainer>
@@ -213,10 +243,16 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
 
       <Content>
         {activeSession ? (
+          // ★ Chatbot prop 형태 변경: ctx로 전달
           <Chatbot
             initialMessage={initialMessage}
-            companyName={activeSession.companyName}
-            jobTitle={activeSession.jobTitle}
+            ctx={{
+              sessionId: activeSession.sessionId,
+              companyName: activeSession.companyName,
+              jobTitle: activeSession.jobTitle,
+              userName: activeSession.userName,
+              maskedText: activeSession.maskedText || '',
+            }}
           />
         ) : (
           <EmptyState>
