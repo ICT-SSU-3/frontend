@@ -3,39 +3,91 @@ import styled from 'styled-components';
 import { useLocation } from 'react-router-dom';
 
 const ModalOverlay = styled.div`
-  position: fixed; inset: 0; background-color: rgba(0,0,0,0.5);
-  display: flex; justify-content: center; align-items: center; z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 `;
+
 const ModalContent = styled.div`
-  background-color: #fff; padding: 30px; border-radius: 10px;
-  max-width: 80%; max-height: 80%; overflow-y: auto; line-height: 1.6;
-  text-align: left; white-space: pre-wrap;
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 80%;
+  max-height: 80%;
+  overflow-y: auto;
+  line-height: 1.6;
+  text-align: left;
+  white-space: pre-wrap;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 `;
 
 const ItemWrapper = styled.div`
-  background-color: #f0f0f0; border-radius: 10px; padding: 15px 20px;
-  margin-bottom: 10px; display: flex; align-items: flex-start; gap: 16px;
+  background-color: #f0f0f0;
+  border-radius: 10px;
+  padding: 15px 20px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 `;
 
 const Container = styled.div`
-  padding: 40px; background-color: #ffffff; text-align: center;
-  width: 90%; max-width: 900px; margin: 0 auto;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 10px;
-  font-family: 'Pretendard', sans-serif;
+  padding: 40px;
+  background-color: #ffffff;
+  text-align: center;
+  width: 90%;
+  max-width: 750px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  font-family: 'Pretendard', sans-serif; /* 폰트 유지 */
 `;
 
-const Header = styled.div` text-align: center; margin-bottom: 20px; `;
-const Title = styled.h2` font-size: 24px; font-weight: bold; margin-bottom: 20px; `;
-const HeaderInfo = styled.div` font-size: 16px; color: #555; `;
-const Icon = styled.span` margin-left: 8px; `;
+const Header = styled.div`
+  text-align: center;
+  margin-bottom: 20px;
+`;
+
+const Title = styled.h2`
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 40px;
+`;
+
+const HeaderInfo = styled.div`
+  font-size: 16px;
+  color: #555;
+`;
+
+const Icon = styled.span`
+  margin-left: 8px;
+`;
 
 const ScrollArea = styled.div`
-  max-height: 520px; overflow-y: auto; padding-right: 10px;
+  max-height: 400px; 
+  overflow-y: auto; 
+  padding-right: 15px;
 `;
 
-const Pill = styled.span`
-  display: inline-block; padding: 4px 10px; border-radius: 9999px;
-  border: 1px solid #e5e7eb; background: #f9fafb; font-size: 12px; color: #374151;
+const ListItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 15px;
 `;
 
 const Monos = styled.pre`
@@ -44,41 +96,68 @@ const Monos = styled.pre`
 `;
 
 
-const Question: React.FC<{ number: number; text: string }> = ({ number, text }) => (
-  <div style={{ flex: 1, minWidth: 0 }}>
-    <div style={{ fontWeight: 700, marginBottom: 6 }}>Q{number}.</div>
-    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</div>
-  </div>
-);
+const Question: React.FC<{ number: number; text: string }> = ({ number, text }) => {
+  return (
+    <ItemWrapper
+      style={{
+        height: '55px',
+        overflowY: 'auto',
+        display: 'block',
+        whiteSpace: 'normal',
+        width: '350px', 
+      }}
+    >
+      <span style={{ fontWeight: 'bold' }}>Q{number}. </span>
+      <span>{text}</span>
+    </ItemWrapper>
+  );
+};
 
-const ScoreBox: React.FC<{ timingScore?: number }> = ({ timingScore }) => (
-  <div style={{ width: 120, textAlign: 'center' }}>
-    <div style={{ fontWeight: 700, marginBottom: 6 }}>Time</div>
-    <Pill>{typeof timingScore === 'number' ? `${timingScore} 점` : 'N/A'}</Pill>
-  </div>
-);
+const Time: React.FC<{ time?: number }> = ({ time }) => {
+  return (
+    <ItemWrapper style={{ width: '90px', height: '55px', justifyContent: 'center' }}>
+      <span>{time}초</span>
+    </ItemWrapper>
+  );
+};
 
-const Feedback: React.FC<{ label: string; text?: string }> = ({ label, text }) => {
-  const [open, setOpen] = useState(false);
-  if (!text) return <div style={{ width: 240 }}><i style={{ color: '#9ca3af' }}>({label} 없음)</i></div>;
+const Score: React.FC<{ score?: number }> = ({ score }) => {
+  return (
+    <ItemWrapper style={{ width: '90px', height: '55px', justifyContent: 'center' }}>
+      <span>{score}점</span>
+    </ItemWrapper>
+  );
+};
+
+const Feedback: React.FC<{ text?: string }> = ({ text }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openModal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => setIsModalOpen(false);
+
   return (
     <>
-      <div
-        onClick={() => setOpen(true)}
+      <ItemWrapper
+        onClick={openModal}
         style={{
-          width: 240, cursor: 'pointer', background: '#eef2ff',
-          border: '1px solid #c7d2fe', color: '#1e1b4b', borderRadius: 8,
-          padding: '10px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          cursor: 'pointer',
+          display: 'block',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          width: '250px', // 고정 너비
         }}
-        title={`${label} (클릭하여 전체 보기)`}
       >
-        {text}
-      </div>
-      {open && (
-        <ModalOverlay onClick={() => setOpen(false)}>
-          <ModalContent onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>{label}</h3>
-            <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+        <span>{text}</span>
+      </ItemWrapper>
+      {isModalOpen && (
+        <ModalOverlay onClick={closeModal}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <p>{text}</p>
           </ModalContent>
         </ModalOverlay>
       )}
@@ -129,15 +208,12 @@ const Leaderboard: React.FC = () => {
       ) : (
         <ScrollArea>
           {rows.map((item, idx) => (
-            <ItemWrapper key={idx}>
+            <ListItem key={idx}>
               <Question number={idx + 1} text={item.question} />
-              <div style={{ width: 120, textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Sec</div>
-                <Pill>{item.time_in_seconds}s</Pill>
-              </div>
-              <ScoreBox timingScore={item.evaluations?.timing_evaluation?.score} />
-              <Feedback label="최종 보고서" text={item.final_report} />
-            </ItemWrapper>
+              <Time time={item.time_in_seconds} />
+              <Score score={item.evaluations?.timing_evaluation?.score} />
+              <Feedback text={item.final_report} />
+            </ListItem>
           ))}
         </ScrollArea>
       )}
