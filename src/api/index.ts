@@ -1,12 +1,13 @@
+import { getQuestion, GetQuestionRequest, GetQuestionResponse } from './question';
+
 const BASE = process.env.REACT_APP_API_BASE_URL ?? '';
 
 type StartReq = {
   company: string;
   role: string;
   user_name: string;
-  resume_masked_text?: string; // 선택 전달
+  resume_masked_text?: string;
 };
-
 type StartRes = { session_id: string; message?: string };
 
 type EvalReq = {
@@ -15,7 +16,6 @@ type EvalReq = {
   answer: string;
   time_in_seconds: number;
 };
-
 type EvalRes = { report_for_current_answer: string };
 
 type EndReq = { session_id: string };
@@ -55,4 +55,11 @@ export const InterviewAPI = {
 
   end: (payload: EndReq) =>
     postJSON<EndRes>('/api/end_interview', payload),
+
+  // ✅ getQuestion 메서드를 InterviewAPI 객체에 추가
+  getQuestion: (payload: GetQuestionRequest) => getQuestion(payload),
 };
+
+// 타입스크립트가 InterviewAPI 객체의 타입을 정확히 추론하도록 돕기 위해
+// 필요한 경우, 명시적으로 타입을 정의할 수도 있습니다.
+// export type InterviewAPI = typeof InterviewAPI;

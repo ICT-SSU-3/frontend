@@ -1,5 +1,3 @@
-// src/components/chat/Chatbot.tsx
-
 import React, { useEffect, useRef, useState, type ComponentType } from 'react';
 import styled from 'styled-components';
 import { InputWrapper, StyledTextarea } from '../common/Input';
@@ -13,7 +11,7 @@ import { InterviewAPI } from '../../api';
 const FaMicrophone = FaMicrophoneRaw as ComponentType;
 const FaPaperPlane = FaPaperPlaneRaw as ComponentType;
 
-/* ================== styles ================== */
+// ================== styles ==================
 const ChatContainer = styled.div`
   display: flex; flex-direction: column;
   height: 100%; width: 100%;
@@ -63,38 +61,24 @@ const DebugBox = styled.pre`
   font-size: 12px; color: #334155; max-height: 220px; overflow: auto; margin: 4px 0 0 0;
 `;
 
-/* ================== constants ================== */
-// 백업 질문 (서버 질문 없을 때 사용)
-const fallbackQuestions = [
-  '네이버에서 데이터 분석가로 일하며 가장 중요하다고 생각하는 역량은 무엇인가요?',
-  '데이터 기반 의사결정으로 성과를 개선했던 경험을 구체적으로 설명해주세요.',
-  '대용량 로그/트래픽 데이터를 다룰 때 파이프라인을 어떻게 설계하시나요?',
-  '모델/분석 결과를 PO/디자이너와 커뮤니케이션할 때 어떤 방식으로 설득하시나요?',
-];
-
-/* ================== types ================== */
+// ================== types ==================
 interface ChatbotProps {
   initialMessage: string;
   ctx: {
-    sessionId?: string;           // start_interview 세션ID
+    sessionId?: string;
     companyName: string;
     jobTitle: string;
     userName: string;
     maskedText?: string;
-    backendQuestions?: string[];  // /api/resume/full 로 생성된 질문
-    backendRaw?: any;             // ResumeFullResponse (응답 전문)
+    backendQuestions?: string[];
+    backendRaw?: any;
   };
 }
 interface Message { text: string; isUser: boolean; }
 
-/* ================== component ================== */
+// ================== component ==================
 export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const navigate = useNavigate();
-
-  // 서버 질문이 있으면 우선 사용, 없으면 fallback
-  const questions = (ctx.backendQuestions && ctx.backendQuestions.length > 0)
-    ? ctx.backendQuestions
-    : fallbackQuestions;
 
   // 자소서/초기 메시지
   const [messages, setMessages] = useState<Message[]>([
@@ -112,9 +96,12 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   // 서버 응답 전문(JSON) 1회 표시 가드
   const postedBackendRawRef = useRef(false);
 
-  // 질문 인덱스/타이머
-  const [currentIdx, setCurrentIdx] = useState<number>(-1);
+  // ⭐ 질문 인덱스 상태 (1부터 시작)
+  const [questionIndex, setQuestionIndex] = useState<number>(0);
+  // ⭐ 총 질문 개수 상태
+  const [totalQuestions, setTotalQuestions] = useState<number>(5); 
   const [questionStartAt, setQuestionStartAt] = useState<number | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
   // 디버깅 상태
   const [sessionId, setSessionId] = useState<string | undefined>(ctx.sessionId);
@@ -152,36 +139,34 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const sendBot  = (text: string) =>
     setMessages(prev => [...prev, { text, isUser: false }]);
 
-
-  // FIX: 서버 응답 전문(JSON) 1회 출력
-  useEffect(() => {
-  // `ctx.backendRaw`가 존재하고 `postedBackendRawRef`가 아직 false일 때만 실행
-  if (!postedBackendRawRef.current && ctx.backendRaw) {
-    postedBackendRawRef.current = true;
-    
-    // ⭐ 수정된 부분: session_id만 추출하여 메시지 생성
-    const sessionId = ctx.backendRaw.session_id;
-    if (sessionId) {
-      sendBot(`✅ 세션이 생성되었습니다. (ID: ${sessionId})`);
-    } else {
-      sendBot(`⚠️ 세션 ID를 찾을 수 없습니다.`);
-    }
-  }
-}, [ctx.backendRaw]);
-
-  // 다음 질문 송출
-  const askNext = (nextIdx: number) => {
-    // FIX: dummyQuestions 참조 제거, 통일해서 questions 사용
-    if (nextIdx >= questions.length) {
-      sendBot('준비된 질문은 여기까지예요. 필요하면 아래에서 면접을 종료해 로그를 확인해 주세요.');
-      setCurrentIdx(nextIdx);
-      setQuestionStartAt(null);
+  // ⭐ API를 호출하여 다음 질문을 가져오는 함수
+  const fetchNextQuestion = async (nextIndex: number) => {
+    if (!sessionId) {
+      setLastError('세션이 준비되지 않았습니다.');
       return;
     }
-    const q = questions[nextIdx];
-    sendBot(q);
-    setCurrentIdx(nextIdx);
-    setQuestionStartAt(Date.now());
+
+    try {
+      const res = await InterviewAPI.getQuestion({
+        session_id: Number(sessionId),
+        index: nextIndex,
+      });
+
+      setTotalQuestions(res.total);
+      setCurrentQuestion(res.question_content);
+      sendBot(res.question_content);
+      setQuestionStartAt(Date.now());
+      setQuestionIndex(nextIndex);
+
+    } catch (e: any) {
+      setLastError(e?.detail || '질문을 가져오는 중 오류가 발생했습니다.');
+      if (e?.detail && e.detail.includes('범위를 벗어났습니다')) {
+        // 면접 종료 로직
+        sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
+      } else {
+        sendBot('질문을 가져오는 데 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    }
   };
 
   // 메시지 전송
@@ -192,46 +177,47 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     sendUser(text);
     setInputValue('');
 
-    // 자기소개 답이 오면 0번 질문 시작
-    if (currentIdx === -1) {
-      askNext(0);
+    // 첫 메시지 (자기소개) 답이 오면 1번 질문 시작
+    if (questionIndex === 0) {
+      fetchNextQuestion(1);
       return;
     }
 
-    // 평가 api 호출 (세션 없으면 스킵하고 다음 질문)
+    // ⭐ 평가 API 호출
     if (!sessionId) {
-      setLastError('세션이 아직 준비되지 않아 evaluate를 생략했습니다.');
-      askNext(currentIdx + 1);
-      return;
+      setLastError('세션이 준비되지 않아 평가를 생략했습니다.');
+    } else {
+      try {
+        const sec = questionStartAt != null
+          ? Math.max(1, Math.round((Date.now() - questionStartAt) / 1000))
+          : 60;
+        
+        const reqPayload = {
+          session_id: sessionId,
+          question: currentQuestion,
+          answer: text,
+          time_in_seconds: sec,
+        };
+        
+        setLastRequest({ type: 'evaluate_answer', payload: reqPayload });
+        const res = await InterviewAPI.evaluate(reqPayload);
+        setLastResponse({ type: 'evaluate_answer', result: res });
+        const { report_for_current_answer } = res;
+        setLastEval(report_for_current_answer);
+        sendBot(`평가 요약: ${report_for_current_answer}`);
+
+      } catch (e: any) {
+        setLastError(String(e?.message || e));
+        sendBot('평가 중 오류가 발생했습니다. 다음 질문으로 넘어갈게요.');
+      }
     }
 
-    try {
-      const sec = questionStartAt != null
-        ? Math.max(1, Math.round((Date.now() - questionStartAt) / 1000))
-        : 60;
-
-      // FIX: 현재 질문도 questions 기준으로 참조
-      const question = questions[currentIdx] ?? '(unknown)';
-      const reqPayload = {
-        session_id: sessionId,
-        question,
-        answer: text,
-        time_in_seconds: sec,
-      };
-      setLastRequest({ type: 'evaluate_answer', payload: reqPayload });
-
-      const res = await InterviewAPI.evaluate(reqPayload);
-      setLastResponse({ type: 'evaluate_answer', result: res });
-
-      const { report_for_current_answer } = res;
-      setLastEval(report_for_current_answer);
-      sendBot(`평가 요약: ${report_for_current_answer}`);
-
-      askNext(currentIdx + 1);
-    } catch (e: any) {
-      setLastError(String(e?.message || e));
-      sendBot('평가 중 오류가 발생했습니다. 다음 질문으로 넘어갈게요.');
-      askNext(currentIdx + 1);
+    // ⭐ 다음 질문 요청
+    if (questionIndex < totalQuestions) {
+      fetchNextQuestion(questionIndex + 1);
+    } else {
+      // 마지막 질문까지 완료했으면 면접 종료 메시지 표시
+      sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
     }
   };
 
@@ -329,9 +315,10 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
         <DebugBox>
           {JSON.stringify({
             sessionId: sessionId ?? '(pending)',
-            currentQuestionIndex: currentIdx,
-            // FIX: 여기서도 questions 사용
-            currentQuestion: currentIdx >= 0 && currentIdx < questions.length ? questions[currentIdx] : null,
+            // ⭐ 변경된 부분
+            currentQuestionIndex: questionIndex,
+            totalQuestions,
+            currentQuestion,
             lastEvaluation: lastEval || null,
             lastError: lastError || null,
             lastRequest,
