@@ -27,7 +27,8 @@ interface InterviewInfoModalProps {
     pdfFile: File | null;
     maskedText: string;
     initialQuestion: string;
-    sessionId: string;
+    // ⭐ resumeFull API 응답 전체를 전달
+    fullResumeData: ResumeFullResponse; 
   }) => void;
 }
 
@@ -133,7 +134,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         jobTitle,
         maskedText: resumeText,
         initialQuestion: initialQuestion,
-        sessionId: resumeFullData.session_id,
+        fullResumeData: resumeFullData,
       });
 
       onClose();

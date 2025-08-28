@@ -152,32 +152,22 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const sendBot  = (text: string) =>
     setMessages(prev => [...prev, { text, isUser: false }]);
 
-  // 자소서(마스킹) 1회 출력
-  useEffect(() => {
-    if (postedMaskedRef.current) return;
-    const full = (ctx.maskedText || '').trim();
-    if (!full) return;
-
-    postedMaskedRef.current = true;
-    const sliced = full.slice(0, MAX_MASKED_CHARS);
-    const omitted = full.length - sliced.length;
-
-    const header = '📄 자소서(마스킹) 원문을 공유합니다.\n';
-    const tail = omitted > 0
-      ? `\n\n(※ 길어 앞 ${MAX_MASKED_CHARS.toLocaleString()}자만 표시, 나머지 ${omitted.toLocaleString()}자 생략)`
-      : '';
-
-    sendBot(header + sliced + tail);
-  }, [ctx.maskedText]); // FIX: 의존성 최소화, sendBot 사용 허용
 
   // FIX: 서버 응답 전문(JSON) 1회 출력
   useEffect(() => {
-    if (!postedBackendRawRef.current && ctx.backendRaw) {
-      postedBackendRawRef.current = true;
-      const pretty = JSON.stringify(ctx.backendRaw, null, 2);
-      sendBot('📦 서버 응답 전문(JSON):\n' + pretty);
+  // `ctx.backendRaw`가 존재하고 `postedBackendRawRef`가 아직 false일 때만 실행
+  if (!postedBackendRawRef.current && ctx.backendRaw) {
+    postedBackendRawRef.current = true;
+    
+    // ⭐ 수정된 부분: session_id만 추출하여 메시지 생성
+    const sessionId = ctx.backendRaw.session_id;
+    if (sessionId) {
+      sendBot(`✅ 세션이 생성되었습니다. (ID: ${sessionId})`);
+    } else {
+      sendBot(`⚠️ 세션 ID를 찾을 수 없습니다.`);
     }
-  }, [ctx.backendRaw]);
+  }
+}, [ctx.backendRaw]);
 
   // 다음 질문 송출
   const askNext = (nextIdx: number) => {

@@ -119,10 +119,12 @@ interface MainViewProps {
     userName: string;
     companyName: string;
     jobTitle: string;
-    maskedText?: string;  //자소서 마스킹
-    pdfFile?: File | null;
+    maskedText: string;
+    initialQuestion: string;
+    fullResumeData: ResumeFullResponse;
   } | null;
 }
+
 
 type Session = {
   id: string;
@@ -154,8 +156,12 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
       companyName: String(interviewData.companyName ?? ''),
       jobTitle: String(interviewData.jobTitle ?? ''),
       userName: String(interviewData.userName ?? ''),
-      maskedText: interviewData.maskedText, // ★ 저장
+      maskedText: interviewData.maskedText,
       createdAt: Date.now(),
+      // ⭐️ resumeFullData에서 sessionId와 질문 목록을 바로 가져와 저장
+      sessionId: interviewData.fullResumeData.session_id,
+      backendQuestions: interviewData.fullResumeData.questions?.map(q => q.question_content),
+      backendRaw: interviewData.fullResumeData,
     };
     setSessions(prev => [s, ...prev]); // 최신 위
     setActiveId(s.id);
