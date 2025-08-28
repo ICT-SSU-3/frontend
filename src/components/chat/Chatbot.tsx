@@ -1,17 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+// src/components/chat/Chatbot.tsx
+
+import React, { useEffect, useRef, useState, type ComponentType } from 'react';
 import styled from 'styled-components';
 import { InputWrapper, StyledTextarea } from '../common/Input';
 import { recognizeSpeech } from '../../api/stt';
-import { type ComponentType } from 'react';
 import { FaMicrophone as FaMicrophoneRaw, FaPaperPlane as FaPaperPlaneRaw } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { StyledButton } from '../common/Button';
 import { InterviewAPI } from '../../api';
 
-
+// 아이콘 타입 단언
 const FaMicrophone = FaMicrophoneRaw as ComponentType;
 const FaPaperPlane = FaPaperPlaneRaw as ComponentType;
 
+/* ================== styles ================== */
 const ChatContainer = styled.div`
   display: flex; flex-direction: column;
   height: 100%; width: 100%;
@@ -46,11 +48,8 @@ const StyledIcon = styled.button<{ isRecording?: boolean }>`
   background: none; border: none; cursor: pointer; font-size: 20px;
   color: #555; padding: 0;
   &:hover { color: #000; }
-  ${({ isRecording }) => isRecording && `
-    color: red;
-  `}
+  ${({ isRecording }) => isRecording && ` color: red; `}
 `;
-
 const EndButtonWrap = styled.div`
   position: sticky; bottom: 8px; display: flex; justify-content: center; padding: 8px 0;
   background: transparent; pointer-events: none; z-index: 1;
@@ -64,30 +63,40 @@ const DebugBox = styled.pre`
   font-size: 12px; color: #334155; max-height: 220px; overflow: auto; margin: 4px 0 0 0;
 `;
 
-// 더미 질문 -> 추후 질문 생성 api로 수정 필요
-const dummyQuestions = [
+/* ================== constants ================== */
+// 백업 질문 (서버 질문 없을 때 사용)
+const fallbackQuestions = [
   '네이버에서 데이터 분석가로 일하며 가장 중요하다고 생각하는 역량은 무엇인가요?',
   '데이터 기반 의사결정으로 성과를 개선했던 경험을 구체적으로 설명해주세요.',
   '대용량 로그/트래픽 데이터를 다룰 때 파이프라인을 어떻게 설계하시나요?',
   '모델/분석 결과를 PO/디자이너와 커뮤니케이션할 때 어떤 방식으로 설득하시나요?',
 ];
 
+/* ================== types ================== */
 interface ChatbotProps {
   initialMessage: string;
   ctx: {
-    sessionId?: string;           // start_interview 세션ID 
+    sessionId?: string;           // start_interview 세션ID
     companyName: string;
     jobTitle: string;
     userName: string;
     maskedText?: string;
+    backendQuestions?: string[];  // /api/resume/full 로 생성된 질문
+    backendRaw?: any;             // ResumeFullResponse (응답 전문)
   };
 }
 interface Message { text: string; isUser: boolean; }
 
+/* ================== component ================== */
 export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const navigate = useNavigate();
 
-  // 자소서 마스킹 데이터 출력
+  // 서버 질문이 있으면 우선 사용, 없으면 fallback
+  const questions = (ctx.backendQuestions && ctx.backendQuestions.length > 0)
+    ? ctx.backendQuestions
+    : fallbackQuestions;
+
+  // 자소서/초기 메시지
   const [messages, setMessages] = useState<Message[]>([
     { text: initialMessage, isUser: false },
   ]);
@@ -96,45 +105,25 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-// 자소서 가드 -> 1500자만 보여줌
+  // 자소서 마스킹 표시 (앞 1500자만)
   const postedMaskedRef = useRef(false);
-  const MAX_MASKED_CHARS = 1500; 
+  const MAX_MASKED_CHARS = 1500;
 
-  useEffect(() => {
-    if (postedMaskedRef.current) return;
-    const full = (ctx.maskedText || '').trim();
-    if (!full) return;
+  // 서버 응답 전문(JSON) 1회 표시 가드
+  const postedBackendRawRef = useRef(false);
 
-    postedMaskedRef.current = true;
-
-    const sliced = full.slice(0, MAX_MASKED_CHARS);
-    const omitted = full.length - sliced.length;
-
-    const header = '📄 자소서(마스킹) 원문을 공유합니다.\n';
-    const tail = omitted > 0 ? `\n\n(※ 길어 앞 ${MAX_MASKED_CHARS.toLocaleString()}자만 표시, 나머지 ${omitted.toLocaleString()}자 생략)` : '';
-
-    setMessages(prev => [
-      ...prev,
-      { text: header + sliced + tail, isUser: false }, // 자소서 마스킹 데이터 호출
-    ]);
-  }, [ctx.maskedText]);
-
-  // 질문 인덱스 -> 자기소개 답변 오면 질문 생성
+  // 질문 인덱스/타이머
   const [currentIdx, setCurrentIdx] = useState<number>(-1);
   const [questionStartAt, setQuestionStartAt] = useState<number | null>(null);
 
-  // 디버깅
+  // 디버깅 상태
   const [sessionId, setSessionId] = useState<string | undefined>(ctx.sessionId);
   const [lastEval, setLastEval] = useState<string>('');
   const [lastError, setLastError] = useState<string>('');
-  const [lastRequest, setLastRequest] = useState<any>(null);   // ★ 디버그용
-  const [lastResponse, setLastResponse] = useState<any>(null); // ★ 디버그용
+  const [lastRequest, setLastRequest] = useState<any>(null);
+  const [lastResponse, setLastResponse] = useState<any>(null);
 
-  useEffect(() => {
-    if (ctx.sessionId && ctx.sessionId !== sessionId) setSessionId(ctx.sessionId);
-  }, [ctx.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // textarea 높이 설정
+  // textarea 높이 자동
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -143,7 +132,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [inputValue]);
 
-  // 스크롤
+  // 스크롤 하단 유지
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (listRef.current) {
@@ -151,18 +140,55 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   }, [messages]);
 
-  const sendUser = (text: string) => setMessages(prev => [...prev, { text, isUser: true }]);
-  const sendBot  = (text: string) => setMessages(prev => [...prev, { text, isUser: false }]);
+  // 세션 갱신
+  useEffect(() => {
+    if (ctx.sessionId && ctx.sessionId !== sessionId) setSessionId(ctx.sessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.sessionId]);
 
-  // 다음 질문 보내기
+  // 유틸: 메시지 추가
+  const sendUser = (text: string) =>
+    setMessages(prev => [...prev, { text, isUser: true }]);
+  const sendBot  = (text: string) =>
+    setMessages(prev => [...prev, { text, isUser: false }]);
+
+  // 자소서(마스킹) 1회 출력
+  useEffect(() => {
+    if (postedMaskedRef.current) return;
+    const full = (ctx.maskedText || '').trim();
+    if (!full) return;
+
+    postedMaskedRef.current = true;
+    const sliced = full.slice(0, MAX_MASKED_CHARS);
+    const omitted = full.length - sliced.length;
+
+    const header = '📄 자소서(마스킹) 원문을 공유합니다.\n';
+    const tail = omitted > 0
+      ? `\n\n(※ 길어 앞 ${MAX_MASKED_CHARS.toLocaleString()}자만 표시, 나머지 ${omitted.toLocaleString()}자 생략)`
+      : '';
+
+    sendBot(header + sliced + tail);
+  }, [ctx.maskedText]); // FIX: 의존성 최소화, sendBot 사용 허용
+
+  // FIX: 서버 응답 전문(JSON) 1회 출력
+  useEffect(() => {
+    if (!postedBackendRawRef.current && ctx.backendRaw) {
+      postedBackendRawRef.current = true;
+      const pretty = JSON.stringify(ctx.backendRaw, null, 2);
+      sendBot('📦 서버 응답 전문(JSON):\n' + pretty);
+    }
+  }, [ctx.backendRaw]);
+
+  // 다음 질문 송출
   const askNext = (nextIdx: number) => {
-    if (nextIdx >= dummyQuestions.length) {
+    // FIX: dummyQuestions 참조 제거, 통일해서 questions 사용
+    if (nextIdx >= questions.length) {
       sendBot('준비된 질문은 여기까지예요. 필요하면 아래에서 면접을 종료해 로그를 확인해 주세요.');
       setCurrentIdx(nextIdx);
       setQuestionStartAt(null);
       return;
     }
-    const q = dummyQuestions[nextIdx];
+    const q = questions[nextIdx];
     sendBot(q);
     setCurrentIdx(nextIdx);
     setQuestionStartAt(Date.now());
@@ -182,7 +208,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       return;
     }
 
-    // 평가 api 호출 
+    // 평가 api 호출 (세션 없으면 스킵하고 다음 질문)
     if (!sessionId) {
       setLastError('세션이 아직 준비되지 않아 evaluate를 생략했습니다.');
       askNext(currentIdx + 1);
@@ -194,7 +220,8 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
         ? Math.max(1, Math.round((Date.now() - questionStartAt) / 1000))
         : 60;
 
-      const question = dummyQuestions[currentIdx] ?? '(unknown)';
+      // FIX: 현재 질문도 questions 기준으로 참조
+      const question = questions[currentIdx] ?? '(unknown)';
       const reqPayload = {
         session_id: sessionId,
         question,
@@ -218,6 +245,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
+  // 엔터 전송
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -225,16 +253,18 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
-  // 면접 종료 -> 리더보드 페이지로 이동
+  // 면접 종료 → 리더보드 이동
   const onEndInterview = async () => {
     try {
       if (!sessionId) {
-        navigate('/leaderboard', { state: {
-          interview_log: [],
-          note: '세션 없음',
-          companyName: ctx.companyName,
-          jobTitle: ctx.jobTitle,
-        } });
+        navigate('/leaderboard', {
+          state: {
+            interview_log: [],
+            note: '세션 없음',
+            companyName: ctx.companyName,
+            jobTitle: ctx.jobTitle,
+          },
+        });
         return;
       }
       const reqPayload = { session_id: sessionId };
@@ -243,54 +273,58 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       const data = await InterviewAPI.end(reqPayload);
       setLastResponse({ type: 'end_interview', result: data });
 
-      navigate('/leaderboard', { state: {
-        ...data,
-        companyName: ctx.companyName,
-        jobTitle: ctx.jobTitle,
-      } });
+      navigate('/leaderboard', {
+        state: {
+          ...data,
+          companyName: ctx.companyName,
+          jobTitle: ctx.jobTitle,
+        },
+      });
     } catch (e: any) {
       setLastError('end_interview 실패: ' + (e?.message || e));
-      navigate('/leaderboard', { state: {
-        interview_log: [],
-        error: String(e?.message || e),
-        companyName: ctx.companyName,
-        jobTitle: ctx.jobTitle,
-      } });
+      navigate('/leaderboard', {
+        state: {
+          interview_log: [],
+          error: String(e?.message || e),
+          companyName: ctx.companyName,
+          jobTitle: ctx.jobTitle,
+        },
+      });
     }
   };
-  // 답변 녹음
+
+  // 음성 녹음 → STT
   const handleSpeechRecognition = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
-    } else {
-      // 녹음 시작
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        audioChunksRef.current = [];
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
 
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          audioChunksRef.current.push(event.data);
-        };
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
 
-        mediaRecorderRef.current.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          try {
-            const result = await recognizeSpeech(audioBlob);
-            setInputValue(result.transcript);
-          } catch (error) {
-            console.error('STT API 오류:', error);
-            alert('음성 인식 중 오류가 발생했습니다.');
-          }
-        };
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        try {
+          const result = await recognizeSpeech(audioBlob);
+          setInputValue(result.transcript);
+        } catch (error) {
+          console.error('STT API 오류:', error);
+          alert('음성 인식 중 오류가 발생했습니다.');
+        }
+      };
 
-        mediaRecorderRef.current.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error('음성 녹음 권한 오류:', err);
-        alert('마이크 접근 권한이 필요합니다.');
-      }
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('음성 녹음 권한 오류:', err);
+      alert('마이크 접근 권한이 필요합니다.');
     }
   };
 
@@ -301,12 +335,13 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
           <MessageBubble key={i} isUser={m.isUser}>{m.text}</MessageBubble>
         ))}
 
-        {/* 디버그  */}
+        {/* 디버그 */}
         <DebugBox>
           {JSON.stringify({
             sessionId: sessionId ?? '(pending)',
             currentQuestionIndex: currentIdx,
-            currentQuestion: currentIdx >= 0 && currentIdx < dummyQuestions.length ? dummyQuestions[currentIdx] : null,
+            // FIX: 여기서도 questions 사용
+            currentQuestion: currentIdx >= 0 && currentIdx < questions.length ? questions[currentIdx] : null,
             lastEvaluation: lastEval || null,
             lastError: lastError || null,
             lastRequest,
@@ -336,7 +371,9 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
             onKeyDown={handleKeyDown}
           />
         </InputWrapper>
-        <StyledIcon onClick={handleSendMessage}><FaPaperPlane /></StyledIcon>
+        <StyledIcon onClick={handleSendMessage}>
+          <FaPaperPlane />
+        </StyledIcon>
       </ChatInputContainer>
     </ChatContainer>
   );

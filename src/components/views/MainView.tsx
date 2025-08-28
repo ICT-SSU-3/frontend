@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { StyledButton } from '../common/Button';
 import Chatbot from '../chat/Chatbot';
 import { InterviewAPI } from '../../api';
+import { resumeFull, ResumeFullResponse } from '../../api/resumeFull';
 
 const PageContainer = styled.div`
   display: flex;
@@ -130,7 +131,9 @@ type Session = {
   createdAt: number;
   userName: string;
   maskedText?: string;   
-  sessionId?: string;      // start_interview로 받은 세션 id
+  sessionId?: string;
+  backendQuestions?: string[];
+  backendRaw?: ResumeFullResponse; // 응답 전문 전체를 보관
 };
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -163,6 +166,40 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
     () => sessions.find(s => s.id === activeId) ?? null,
     [sessions, activeId]
   );
+
+  useEffect(() => {
+  if (!activeSession) return;
+  // 이미 받아왔으면 패스
+  if (activeSession.sessionId && activeSession.backendRaw) return;
+
+  (async () => {
+    try {
+      const payload = {
+        user_name: activeSession.userName,
+        company_name: activeSession.companyName,
+        jd_name: activeSession.jobTitle,
+        resume_text: activeSession.maskedText || '', // 마스킹된 자소서 사용
+      };
+      const res = await resumeFull(payload);
+
+      setSessions(prev =>
+        prev.map(x =>
+          x.id === activeSession.id
+            ? {
+                ...x,
+                sessionId: res.session_id,
+                backendQuestions: (res.questions || []).map(q => q.question_content),
+                backendRaw: res, // 응답 전문
+              }
+            : x
+        )
+      );
+    } catch (e) {
+      console.error('resume_full 실패:', e);
+      // 실패해도 UI는 유지 (나중에 재시도 가능)
+    }
+  })();
+}, [activeSession?.id]);
 
   // ⭐ 면접 생성 시 서버로 start_interview 호출 → session_id 보관
   useEffect(() => {
@@ -248,6 +285,8 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
               jobTitle: activeSession.jobTitle,
               userName: activeSession.userName,
               maskedText: activeSession.maskedText || '',
+              backendQuestions: activeSession.backendQuestions || [],
+              backendRaw: activeSession.backendRaw, // ★ 응답 전문
             }}
           />
         ) : (
