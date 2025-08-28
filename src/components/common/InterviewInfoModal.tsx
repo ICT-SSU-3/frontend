@@ -4,6 +4,7 @@ import Modal from './Modal';
 import { InputWrapper, StyledInput, Icon } from './Input';
 import { StyledButton } from './Button';
 import { maskResume } from '../../api/resume';
+import { resumeFull, ResumeFullResponse } from '../../api/resumeFull';
 
 const Title = styled.h3`
   font-size: 20px; font-weight: bold; margin-bottom: 30px; text-align: center;
@@ -26,6 +27,7 @@ interface InterviewInfoModalProps {
     pdfFile: File | null;
     maskedText: string;
     initialQuestion: string;
+    sessionId: string;
   }) => void;
 }
 
@@ -77,6 +79,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
   const [maskedText, setMaskedText] = useState<string | null>(null);
   const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fullResumeData, setFullResumeData] = useState<ResumeFullResponse | null>(null);
 
   const isFormValid = Boolean(pdfFile && userName && companyName && jobTitle);
 
@@ -87,6 +90,8 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         setPdfFile(file);
         setError(null);
         setInitialQuestion(null);
+        setMaskedText(null);
+        setFullResumeData(null);
       } else {
         alert('PDF 파일만 업로드 가능합니다.');
         e.target.value = '';
@@ -100,15 +105,26 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
     setLoading(true);
     setError(null);
     setInitialQuestion(null);
+    setMaskedText(null);
 
     try {
+      // 1. resume/mask API 호출
       const maskingData = await maskResume(pdfFile, userName);
       const resumeText = maskingData.masked_text;
       setMaskedText(resumeText);
+      console.log("마스킹 성공:", maskingData);
 
-      //initial question
-      const iq = `${companyName}의 ${jobTitle}에 대한 면접을 시작하겠습니다. 간단하게 자기소개 해주세요.`;
-      setInitialQuestion(iq);
+      // 2. resume/full API 호출
+      const resumeFullData = await resumeFull({
+        user_name: userName,
+        company_name: companyName,
+        jd_name: jobTitle,
+        resume_text: resumeText,
+      });
+      setFullResumeData(resumeFullData);
+      const initialQuestion = resumeFullData.questions[0].question_content;
+
+      console.log("초기 질문 생성 성공:", initialQuestion);
 
       onStartInterview({
         pdfFile,
@@ -116,10 +132,12 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         companyName,
         jobTitle,
         maskedText: resumeText,
-        initialQuestion: iq,
+        initialQuestion: initialQuestion,
+        sessionId: resumeFullData.session_id,
       });
 
       onClose();
+
     } catch (err) {
       console.error('API 통신 중 오류 발생:', err);
       setError((err as Error).message);
@@ -172,7 +190,6 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
       </StyledButton>
 
       {error && <ErrorDisplay>{error}</ErrorDisplay>}
-
       
       {maskedText && (
         <>
@@ -181,9 +198,8 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
         </>
       )}
 
-      
-      {initialQuestion && (
-        <QuestionDisplay>{initialQuestion}</QuestionDisplay>
+      {fullResumeData && fullResumeData.questions[0] && (
+        <QuestionDisplay>{fullResumeData.questions[0].question_content}</QuestionDisplay>
       )}
     </Modal>
   );
