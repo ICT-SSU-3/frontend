@@ -1,37 +1,19 @@
+// src/api/index.ts
+
 import { getQuestion, GetQuestionRequest, GetQuestionResponse } from './question';
+import { resumeFull, ResumeFullRequest, ResumeFullResponse } from './resumeFull';
+import { fineval, FinevalRequest, FinevalResponse } from './fineval';
 
-const BASE = process.env.REACT_APP_API_BASE_URL ?? '';
+const BASE = process.env.REACT_APP_API_BASE_URL;
 
-type StartReq = {
-  company: string;
-  role: string;
-  user_name: string;
-  resume_masked_text?: string;
-};
-type StartRes = { session_id: string; message?: string };
-
+// ⭐ EvalReq 타입 재정의: 백엔드 명세에 맞게 수정
 type EvalReq = {
-  session_id: string;
-  question: string;
+  session_id: number;
+  question_id: number;
   answer: string;
-  time_in_seconds: number;
+  response_time: number;
 };
 type EvalRes = { report_for_current_answer: string };
-
-type EndReq = { session_id: string };
-type EndRes = {
-  interview_log: Array<{
-    question: string;
-    answer: string;
-    time_in_seconds: number;
-    evaluations: {
-      star_evaluation?: string;
-      logic_evaluation?: string;
-      timing_evaluation?: { score: number; evaluation: string };
-    };
-    final_report: string;
-  }>;
-};
 
 async function postJSON<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -46,20 +28,39 @@ async function postJSON<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const InterviewAPI = {
-  start: (payload: StartReq) =>
-    postJSON<StartRes>('/api/start_interview', payload),
+async function getJSON<T>(path: string, params: URLSearchParams): Promise<T> {
+  const res = await fetch(`${BASE}${path}?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'accept': 'application/json' },
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    const msg = typeof data?.detail === 'string'
+      ? `Error ${res.status}: ${data.detail}`
+      : `Error ${res.status}: ${JSON.stringify(data)}`;
+    const error = new Error(msg) as any;
+    error.detail = data.detail;
+    throw error;
+  }
+  return res.json() as Promise<T>;
+}
 
+export const InterviewAPI = {
+  // ⭐ evaluate 메서드: 새로운 명세에 맞춰 payload 타입 수정
   evaluate: (payload: EvalReq) =>
     postJSON<EvalRes>('/api/evaluate_answer', payload),
 
-  end: (payload: EndReq) =>
-    postJSON<EndRes>('/api/end_interview', payload),
+  // ⭐ getQuestion 메서드 유지 (이전과 동일)
+  getQuestion: (payload: GetQuestionRequest) => getJSON<GetQuestionResponse>('/api/question', new URLSearchParams({ session_id: payload.session_id.toString(), index: payload.index.toString() })),
 
-  // ✅ getQuestion 메서드를 InterviewAPI 객체에 추가
-  getQuestion: (payload: GetQuestionRequest) => getQuestion(payload),
+  // ⭐ resumeFull 메서드 유지
+  resumeFull: (payload: ResumeFullRequest) => postJSON<ResumeFullResponse>('/api/resume/full', payload),
+
+  fineval: (payload: FinevalRequest) =>
+    getJSON<FinevalResponse>('/api/fineval', new URLSearchParams({ session_id: payload.session_id.toString() })),
 };
 
-// 타입스크립트가 InterviewAPI 객체의 타입을 정확히 추론하도록 돕기 위해
-// 필요한 경우, 명시적으로 타입을 정의할 수도 있습니다.
-// export type InterviewAPI = typeof InterviewAPI;
+export {
+  getQuestion,
+  resumeFull,
+};

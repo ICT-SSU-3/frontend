@@ -125,7 +125,6 @@ interface MainViewProps {
   } | null;
 }
 
-
 type Session = {
   id: string;
   companyName: string;
@@ -172,7 +171,9 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
     () => sessions.find(s => s.id === activeId) ?? null,
     [sessions, activeId]
   );
-
+  
+  // ⭐️ resumeFull 중복 호출 로직을 제거
+  /*
   useEffect(() => {
   if (!activeSession) return;
   // 이미 받아왔으면 패스
@@ -205,9 +206,11 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
       // 실패해도 UI는 유지 (나중에 재시도 가능)
     }
   })();
-}, [activeSession?.id]);
+  }, [activeSession?.id]);
+  */
 
-  // ⭐ 면접 생성 시 서버로 start_interview 호출 → session_id 보관
+  // ⭐ start_interview API 호출 로직 제거
+  /*
   useEffect(() => {
     if (!activeSession || activeSession.sessionId) return;
     (async () => {
@@ -226,6 +229,7 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
       }
     })();
   }, [activeSession?.id]);
+  */
   const sessionsForView = useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
     [sessions]
