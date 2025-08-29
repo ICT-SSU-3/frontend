@@ -24,7 +24,7 @@ export async function getQuestion(req: GetQuestionRequest): Promise<GetQuestionR
   });
 
   // ✅ 절대 URL → 상대경로
-  const url = `/api/question?${params.toString()}`;
+  const url = `/api/question/?${params.toString()}`;
 
   const res = await fetch(url, {
     method: 'GET',
