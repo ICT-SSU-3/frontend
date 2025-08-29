@@ -1,5 +1,7 @@
 // src/api/resumeFull.ts
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+// ❌ API_BASE_URL 제거
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export interface ResumeFullRequest {
   user_name: string;
@@ -13,20 +15,8 @@ export interface ResumeFullResponse {
   summaries: string[];
   pairs: Array<{
     summary: string;
-    jd?: {
-      dataset: "jd";
-      doc_id: string;
-      chunk_id: string;
-      content: string;
-      score: number;
-    } | null;
-    faq?: {
-      dataset: "question";
-      doc_id: string;
-      chunk_id: string;
-      content: string;
-      score: number;
-    } | null;
+    jd?: { dataset: "jd"; doc_id: string; chunk_id: string; content: string; score: number } | null;
+    faq?: { dataset: "question"; doc_id: string; chunk_id: string; content: string; score: number } | null;
   }>;
   questions: Array<{
     question_id: number;
@@ -36,9 +26,8 @@ export interface ResumeFullResponse {
 }
 
 export async function resumeFull(req: ResumeFullRequest): Promise<ResumeFullResponse> {
-  if (!API_BASE_URL) throw new Error('API Base URL is not defined in environment variables.');
-
-  const res = await fetch(`${API_BASE_URL}/api/resume/full`, {
+  // ✅ 절대 URL → 상대경로
+  const res = await fetch('/api/resume/full', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

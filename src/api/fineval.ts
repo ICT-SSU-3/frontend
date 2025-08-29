@@ -1,12 +1,12 @@
 // src/api/fineval.ts
 
-const BASE = process.env.REACT_APP_API_BASE_URL;
+// ❌ BASE_URL 제거
+// const BASE = process.env.REACT_APP_API_BASE_URL;
 
 export type FinevalRequest = {
   session_id: number;
 };
 
-// ⭐ FinevalResponse 타입 수정: 백엔드 명세에 맞게
 export type FinevalResponse = {
   session: {
     session_id: number;
@@ -29,19 +29,16 @@ export type FinevalResponse = {
 };
 
 export async function fineval(payload: FinevalRequest): Promise<FinevalResponse> {
-  // ⭐ POST 대신 GET 요청으로 변경
-  // ⭐ 요청 본문 대신 URL 쿼리 파라미터 사용
   const params = new URLSearchParams({
     session_id: payload.session_id.toString(),
   });
 
-  const url = `${BASE}/api/fineval?${params.toString()}`;
+  // ✅ BASE_URL 제거하고 절대 URL → 상대경로
+  const url = `/api/fineval?${params.toString()}`;
 
   const res = await fetch(url, {
     method: 'GET',
-    headers: {
-      'accept': 'application/json',
-    },
+    headers: { 'accept': 'application/json' },
   });
 
   if (!res.ok) {

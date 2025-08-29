@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+// src/api/stt.ts
+
+// ❌ API_BASE_URL 제거
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 interface RecognizeResponse {
   transcript: string;
@@ -12,15 +15,12 @@ interface ErrorResponse {
 }
 
 export const recognizeSpeech = async (file: Blob, language: string = 'ko-KR'): Promise<RecognizeResponse> => {
-  if (!API_BASE_URL) {
-    throw new Error('API Base URL is not defined in environment variables.');
-  }
-
   const formData = new FormData();
-  formData.append('file', file, 'audio.webm'); // 임의의 파일명
+  formData.append('file', file, 'audio.webm'); 
   formData.append('language', language);
 
-  const response = await fetch(`${API_BASE_URL}/api/stt/google/recognize`, {
+  // ✅ 절대 URL → 상대경로
+  const response = await fetch('/api/stt/google/recognize', {
     method: 'POST',
     body: formData,
   });
@@ -29,8 +29,7 @@ export const recognizeSpeech = async (file: Blob, language: string = 'ko-KR'): P
 
   if (!response.ok) {
     const errorData: ErrorResponse = data;
-    const errorMessage = `Error ${response.status}: ${errorData.detail}`;
-    throw new Error(errorMessage);
+    throw new Error(`Error ${response.status}: ${errorData.detail}`);
   }
 
   return data as RecognizeResponse;

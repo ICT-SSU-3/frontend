@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+// src/api/resume.ts
+
+// ❌ API_BASE_URL 제거
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 interface MaskingResponse {
   engine: string;
@@ -12,15 +15,12 @@ interface ErrorResponse {
 }
 
 export const maskResume = async (file: File, targetName: string): Promise<MaskingResponse> => {
-  if (!API_BASE_URL) {
-    throw new Error('API Base URL is not defined in environment variables.');
-  }
-
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target_name', targetName);
 
-  const response = await fetch(`${API_BASE_URL}/api/resume/mask`, {
+  // ✅ 절대 URL → 상대경로
+  const response = await fetch('/api/resume/mask', {
     method: 'POST',
     body: formData,
   });
@@ -29,8 +29,7 @@ export const maskResume = async (file: File, targetName: string): Promise<Maskin
 
   if (!response.ok) {
     const errorData: ErrorResponse = data;
-    const errorMessage = `Error ${response.status}: ${errorData.detail}`;
-    throw new Error(errorMessage);
+    throw new Error(`Error ${response.status}: ${errorData.detail}`);
   }
 
   return data as MaskingResponse;
