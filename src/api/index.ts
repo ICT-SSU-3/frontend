@@ -51,7 +51,7 @@ export const InterviewAPI = {
     postJSON<EvalRes>('/api/evaluate_answer', payload), // ✅ path만 사용
 
   getQuestion: (payload: GetQuestionRequest) =>
-    getJSON<GetQuestionResponse>('/api/question',
+    getJSON<GetQuestionResponse>('/api/question/',
       new URLSearchParams({
         session_id: payload.session_id.toString(),
         index: payload.index.toString(),

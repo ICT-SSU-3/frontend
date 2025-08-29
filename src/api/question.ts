@@ -16,38 +16,31 @@ export interface GetQuestionResponse {
   question_content: string;
   similar_jd: string | null;
 }
-// 뒤에 슬래시 고정 + 에러 본문 로깅
+
 export async function getQuestion(req: GetQuestionRequest): Promise<GetQuestionResponse> {
   const params = new URLSearchParams({
-    session_id: String(req.session_id),
-    index: String(req.index), // 1-based 주의
+    session_id: req.session_id.toString(),
+    index: req.index.toString(),
   });
 
-  const url = `/api/question/?${params.toString()}`; // ✅ 슬래시 포함
+  // ✅ resumeFull.ts와 동일하게 상대 경로를 사용하도록 수정
+  const url = `/api/question/?${params.toString()}`;
 
-  const res = await fetch(url, { method: 'GET', headers: { accept: 'application/json' } });
-  const text = await res.text();
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'accept': 'application/json' },
+  });
+
+  const data = await res.json();
 
   if (!res.ok) {
-    console.error('[getQuestion] FAIL', res.status, res.statusText, text?.slice(0, 400));
-    // JSON이면 detail 뽑아서 던지기
-    try {
-      const data = JSON.parse(text);
-      const msg = typeof data?.detail === 'string'
-        ? `Error ${res.status}: ${data.detail}`
-        : `Error ${res.status}: ${JSON.stringify(data)}`;
-      const err: any = new Error(msg);
-      err.detail = data?.detail ?? data;
-      throw err;
-    } catch {
-      throw new Error(`Error ${res.status}: ${res.statusText} - ${text?.slice(0, 300)}`);
-    }
+    const msg = typeof data?.detail === 'string'
+      ? `Error ${res.status}: ${data.detail}`
+      : `Error ${res.status}: ${JSON.stringify(data)}`;
+    const error = new Error(msg) as any;
+    error.detail = data.detail;
+    throw error;
   }
 
-  try {
-    return JSON.parse(text) as GetQuestionResponse;
-  } catch {
-    console.error('[getQuestion] JSON parse error', text?.slice(0, 400));
-    throw new Error('Invalid JSON from /api/question/');
-  }
+  return data as GetQuestionResponse;
 }
