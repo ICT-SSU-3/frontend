@@ -1,217 +1,292 @@
-// src/pages/Leaderboard.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { useLocation, useSearchParams } from 'react-router-dom';
-import { InterviewAPI } from '../../api';
-import type { FinevalResponse } from '../../api/fineval';
+import { useLocation } from 'react-router-dom';
 
-/* -------------------------- styles -------------------------- */
 const ModalOverlay = styled.div`
-  position: fixed; inset: 0; background: rgba(0,0,0,.5);
-  display: flex; justify-content: center; align-items: center; z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 `;
+
 const ModalContent = styled.div`
-  background: #fff; padding: 28px; border-radius: 12px;
-  max-width: 900px; width: 90%; max-height: 80vh; overflow-y: auto;
-  text-align: left; line-height: 1.6; white-space: pre-wrap;
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  width: 85%;
+  max-height: 80%;
+  overflow-y: auto;
+  line-height: 1.6;
+  text-align: left;
+  white-space: pre-wrap;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 `;
 const Container = styled.div`
-  padding: 40px; background: #fff; text-align: center;
-  width: 90%; max-width: 820px; margin: 40px auto;
-  box-shadow: 0 4px 10px rgba(0,0,0,.08); border-radius: 12px;
-  font-family: 'Pretendard', sans-serif;
+  padding: 40px;
+  background-color: #ffffff;
+  text-align: center;
+  width: 90%;
+  max-width: 750px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  font-family: 'Pretendard', sans-serif; /* 폰트 유지 */
 `;
-const Title = styled.h2` font-size: 24px; font-weight: 700; margin: 0 0 24px; `;
-const HeaderInfo = styled.div` font-size: 15px; color: #555; margin-bottom: 20px; `;
-const ScrollArea = styled.div` max-height: 460px; overflow-y: auto; padding-right: 8px; `;
+const Header = styled.div`text-align:center; margin-bottom:24px;`;
+const Title = styled.h2`margin:0 0 8px; font-size:24px; font-weight:800;`;
+const HeaderInfo = styled.div`font-size:15px; color:#555;`;
+const ScrollArea = styled.div`max-height:480px; overflow:auto; padding-right:8px;`;
+
+const ListItem = styled.div`
+  display:grid; grid-template-columns: 1fr 90px 260px; gap:12px;
+  align-items:start; margin-bottom:12px;
+`;
+const Pill = styled.div`
+  background:#f5f7fb; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px;
+`;
+const QuestionPill = styled(Pill)`height:50px; overflow:auto; text-align:left;`;
+const ScorePill = styled(Pill)`text-align:center;`;
+const FeedbackButton = styled(Pill)`
+  cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left;
+  &:hover{ background:#eef2ff; border-color:#dbeafe; }
+`;
+
+const H = styled.h3`margin:20px 0 10px; font-size:20px; font-weight:800;`;
+const SubH = styled.h4`margin:14px 0 10px; font-size:16px; font-weight:800; display:flex; gap:8px; align-items:center;`;
+
 const Row = styled.div`
-  display: grid; grid-template-columns: 1fr 100px 180px; gap: 12px;
-  align-items: stretch; margin-bottom: 12px;
+  display:grid; grid-template-columns: 100px 1fr; gap:16px; padding:12px 0;
+  border-top:1px solid #eef2f7;
+  &:first-of-type{ border-top:none; }
 `;
-const Pill = styled.button`
-  width: 100%; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px;
-  padding: 12px 14px; text-align: left; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  &:hover { background: #eef2ff; border-color: #c7d2fe; }
-`;
-const Box = styled.div`
-  background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center; padding: 12px 14px;
-`;
-const Mono = styled.pre`
-  font-size: 12px; text-align: left; background: #f8fafc; border: 1px dashed #cbd5e1;
-  padding: 10px; border-radius: 8px; color: #334155; max-height: 220px; overflow: auto;
-`;
-const Section = styled.div` margin-bottom: 18px; `;
-const ScoreRow = styled.div`
-  display: grid; grid-template-columns: 110px 1fr; gap: 12px;
-  padding: 6px 0; border-bottom: 1px dashed #e5e7eb;
+const Label = styled.div`color:#374151; font-weight:700;`;
+const SmallMono = styled.pre`
+  font-size:12px; text-align:left; background:#f8fafc; border:1px dashed #cbd5e1;
+  padding:10px; border-radius:8px; color:#334155; max-height:220px; overflow:auto;
 `;
 
-/* ----------------------- helpers ----------------------- */
-function parseEval(maybeString: any): any | null {
-  if (!maybeString) return null;
-  if (typeof maybeString === 'object') return maybeString;
-  if (typeof maybeString === 'string') {
-    try {
-      return JSON.parse(maybeString);
-    } catch {
-      return null;
-    }
-  }
+
+type ResultItem = {
+  question_id: number;
+  question_content: string;
+  answer_content: string | null;
+  evaluation_content: any; 
+};
+type FinevalState = {
+  session?: { session_id: number; user_name: string; company_name: string; jd_name: string; created_at: string; };
+  results?: ResultItem[];
+  counts?: { total_questions: number; answered: number };
+  companyName?: string;
+  jobTitle?: string;
+  error?: string;
+  note?: string;
+};
+
+
+const normalize = (s: string) => s.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+const parseEval = (v: any) => {
+  if (!v) return null;
+  if (typeof v === 'object') return v;
+  if (typeof v === 'string') { try { return JSON.parse(v); } catch { return null; } }
   return null;
+};
+
+function firstLine(s?: string) {
+  if (!s) return '';
+  const i = s.indexOf('\n');
+  return (i === -1 ? s : s.slice(0, i)).trim();
 }
 
-function firstLine(text?: string | null): string {
-  if (!text) return '';
-  const idx = text.indexOf('\n');
-  return idx === -1 ? text : text.slice(0, idx);
-}
+// final_report splitter
+function splitReportSections(report: string) {
+  const text = normalize(report);
+  const SCORE = /(\*\*?\s*)?<\s*점수\s*요약\s*>\s*(\*\*)?/i;
+  const FEEDBACK = /(\*\*?\s*)?<\s*종합\s*피드백\s*>\s*(\*\*)?/i;
+  const ACTIONS = new RegExp(
+    [
+      '(\\*\\*?\\s*)?<\\s*다음\\s*면접\\s*대비\\s*핵심\\s*개선\\s*액션\\s*>\\s*(\\*\\*)?',
+      '(\\*\\*?\\s*)?<\\s*핵심\\s*개선\\s*액션\\s*>\\s*(\\*\\*)?',
+      '다음\\s*면접\\s*대비\\s*핵심\\s*개선\\s*액션\\s*:',
+      '핵심\\s*개선\\s*액션\\s*:'
+    ].join('|'), 'i'
+  );
+  const nexts = [SCORE, FEEDBACK, ACTIONS, /^##\s+/im];
 
-/* ------------------------- component ------------------------ */
-type LBState = (FinevalResponse & { companyName?: string; jobTitle?: string }) | undefined;
+  const pick = (start: RegExp, stops: RegExp[]) => {
+    const m = text.match(start); if (!m) return '';
+    const s = (m.index ?? 0) + m[0].length;
+    let e = text.length;
+    for (const r of stops) {
+      const n = text.slice(s).match(r);
+      if (n) e = Math.min(e, s + (n.index ?? 0));
+    }
+    return normalize(text.slice(s, e));
+  };
+
+  const score = pick(SCORE, [FEEDBACK, ACTIONS, /^##\s+/im]);
+  const feedback = pick(FEEDBACK, [ACTIONS, /^##\s+/im]);
+  const actions = pick(ACTIONS, [/^##\s+/im]);
+
+  return { score, feedback, actions, ACTIONS };
+}
 
 const Leaderboard: React.FC = () => {
-  const { state } = useLocation() as { state: LBState };
-  const [search] = useSearchParams();
+  const { state } = useLocation() as { state?: FinevalState };
 
-  const [data, setData] = useState<FinevalResponse | null>(state ?? null);
-  const [error, setError] = useState<string | null>(null);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const company = state?.companyName ?? state?.session?.company_name ?? '';
+  const role = state?.jobTitle ?? state?.session?.jd_name ?? '';
 
-  // URL 직접 접근: /leaderboard?session_id=56
-  useEffect(() => {
-    if (data) return;
-    const sid = search.get('session_id');
-    if (!sid) return;
-    (async () => {
-      try {
-        const res = await InterviewAPI.fineval({ session_id: Number(sid) });
-        setData(res);
-      } catch (e: any) {
-        setError(String(e?.message || e));
-      }
-    })();
-  }, [data, search]);
-
-  const companyName = (state as any)?.companyName ?? data?.session.company_name ?? '';
-  const jobTitle = (state as any)?.jobTitle ?? data?.session.jd_name ?? '';
-
-  // rows: evaluation_content(문자열) → JSON 파싱한 parsedEval 포함
   const rows = useMemo(() => {
-    if (!data?.results) return [];
-    return data.results.map(r => {
-      const parsedEval = parseEval(r.evaluation_content);
+    const list = state?.results ?? [];
+    return list.map((r, idx) => {
+      const parsed = parseEval(r.evaluation_content);
+      const finalReport: string = parsed?.final_report ?? '';
+      const { score, feedback, actions, ACTIONS } = splitReportSections(finalReport);
+
+      // 액션 헤더 자동 보강
+      const actionsTitled =
+        actions
+          ? (new RegExp(ACTIONS, 'i').test(actions) ? actions : `<다음 면접 대비 핵심 개선 액션>\n${actions}`)
+          : '';
+
       return {
-        question: r.question_content ?? '(질문 없음)',
-        answer: r.answer_content ?? '',
-        parsedEval, // { final_score, final_report, evaluations: { ... } } | null
-        reportFirstLine: firstLine(parsedEval?.final_report),
+        idx: idx + 1,
+        question: r.question_content ?? '',
+        answer: parsed?.answer ?? r.answer_content ?? '',
+        time: parsed?.time_in_seconds ?? null,
+        finals: {
+          scoreSection: score,
+          feedbackSection: feedback,
+          actionsSection: actionsTitled,
+          summaryLine: firstLine(feedback || score) || '(요약 없음)',
+          finalScore: parsed?.final_score ?? null,
+        },
+        breakdown: {
+          star: parsed?.evaluations?.star_evaluation ?? null,
+          logic: parsed?.evaluations?.logic_evaluation ?? null,
+          jd: parsed?.evaluations?.jd_evaluation ?? null,
+          timing: parsed?.evaluations?.timing_evaluation ?? null,
+        },
       };
     });
-  }, [data]);
+  }, [state?.results]);
+
+
+  const [selected, setSelected] = useState<(typeof rows)[number] | null>(null);
 
   return (
     <Container>
-      <Title>리더보드</Title>
-
-      <HeaderInfo>
-        <div>🏢 {companyName} / {jobTitle}</div>
-        <div>🙍 {data?.session.user_name}</div>
-        {data?.counts && (
-          <div style={{ marginTop: 6, color: '#6b7280' }}>
-            {data.counts.answered}/{data.counts.total_questions} 답변 완료
+      <Header>
+        <Title>리더보드</Title>
+        <HeaderInfo>🏢 {company} / {role}</HeaderInfo>
+        {(state?.error || state?.note) && (
+          <div style={{ marginTop: 8, color: state?.error ? '#b91c1c' : '#4b5563' }}>
+            {state?.error ?? state?.note}
           </div>
         )}
-        {error && <div style={{ marginTop: 8, color: '#b91c1c' }}>{error}</div>}
-      </HeaderInfo>
+      </Header>
 
-      {!rows.length ? (
-        <div style={{ color: '#9ca3af' }}>표시할 결과가 없습니다.</div>
+      {rows.length === 0 ? (
+        <div style={{ color:'#9ca3af' }}>표시할 인터뷰 로그가 없습니다.</div>
       ) : (
         <ScrollArea>
-          {rows.map((r, idx) => (
-            <React.Fragment key={idx}>
-              <Row>
-                {/* 질문 1줄 */}
-                <Pill onClick={() => setOpenIdx(idx)} title={r.question}>
-                  <b>Q{idx + 1}.</b>&nbsp;{r.question}
-                </Pill>
-
-                {/* 최종 점수 */}
-                <Box title="최종 점수">
-                  {r.parsedEval?.final_score ?? '-'}점
-                </Box>
-
-                {/* 리포트 첫 줄 요약 (없으면 버튼 라벨로 대체) */}
-                <Pill onClick={() => setOpenIdx(idx)} title="상세 보기">
-                  {r.reportFirstLine || '전체 평가/답변 보기'}
-                </Pill>
-              </Row>
-
-              {openIdx === idx && (
-                <ModalOverlay onClick={() => setOpenIdx(null)}>
-                  <ModalContent onClick={(e) => e.stopPropagation()}>
-                    <h3 style={{ marginTop: 0 }}>
-                      Q{idx + 1}. {r.question}
-                    </h3>
-
-                    <Section>
-                      <h4>🗣️ 내 답변</h4>
-                      <div>{r.answer || '(답변 없음)'}</div>
-                    </Section>
-
-                    <Section>
-                      <h4>📊 세부 평가</h4>
-                      {r.parsedEval?.evaluations ? (
-                        <>
-                          <ScoreRow>
-                            <div>STAR</div>
-                            <div>
-                              {r.parsedEval.evaluations.star_evaluation?.score}점 — {r.parsedEval.evaluations.star_evaluation?.evaluation}
-                            </div>
-                          </ScoreRow>
-                          <ScoreRow>
-                            <div>논리성</div>
-                            <div>
-                              {r.parsedEval.evaluations.logic_evaluation?.score}점 — {r.parsedEval.evaluations.logic_evaluation?.evaluation}
-                            </div>
-                          </ScoreRow>
-                          <ScoreRow>
-                            <div>JD</div>
-                            <div>
-                              {r.parsedEval.evaluations.jd_evaluation?.score}점 — {r.parsedEval.evaluations.jd_evaluation?.evaluation}
-                            </div>
-                          </ScoreRow>
-                          <ScoreRow>
-                            <div>발화시간</div>
-                            <div>
-                              {r.parsedEval.evaluations.timing_evaluation?.score}점 — {r.parsedEval.evaluations.timing_evaluation?.evaluation}
-                            </div>
-                          </ScoreRow>
-                        </>
-                      ) : (
-                        <div>세부 평가 없음</div>
-                      )}
-                    </Section>
-
-                    <Section>
-                      <h4>📝 종합 피드백</h4>
-                      <div>{r.parsedEval?.final_report || '(없음)'}</div>
-                    </Section>
-                  </ModalContent>
-                </ModalOverlay>
-              )}
-            </React.Fragment>
+          {rows.map((r) => (
+            <ListItem key={r.idx}>
+              <QuestionPill><b>Q{r.idx}. </b>{r.question}</QuestionPill>
+              <ScorePill>{r.finals.finalScore ?? '-'}점</ScorePill>
+              <FeedbackButton onClick={() => setSelected(r)} title="클릭해서 전체 보기">
+                {r.finals.summaryLine}
+              </FeedbackButton>
+            </ListItem>
           ))}
         </ScrollArea>
       )}
 
-      {/* 디버그 원본 */}
-      <div style={{ marginTop: 20, textAlign: 'left' }}>
-        <h4 style={{ margin: '10px 0' }}>Raw fineval (debug)</h4>
-        <Mono>{JSON.stringify(data, null, 2)}</Mono>
-      </div>
+
+      {selected && (
+        <ModalOverlay onClick={() => setSelected(null)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            {/* Q. 질문 */}
+            <H>Q{selected.idx}. {selected.question}</H>
+
+            {/* 내 답변 */}
+            {selected.answer && (
+              <>
+                <SubH>🗣️ 내 답변</SubH>
+                <div>{selected.answer}</div>
+              </>
+            )}
+
+            {/* 세부 평가 */}
+            {(selected.breakdown.star || selected.breakdown.logic || selected.breakdown.jd || selected.breakdown.timing) && (
+              <>
+                <SubH>📚 세부 평가</SubH>
+                {selected.breakdown.star && (
+                  <Row><Label>STAR</Label>
+                    <div>
+                      {selected.breakdown.star.score != null && <b>{selected.breakdown.star.score}점 — </b>}
+                      {selected.breakdown.star.evaluation}
+                    </div>
+                  </Row>
+                )}
+                {selected.breakdown.logic && (
+                  <Row><Label>논리성</Label>
+                    <div>
+                      {selected.breakdown.logic.score != null && <b>{selected.breakdown.logic.score}점 — </b>}
+                      {selected.breakdown.logic.evaluation}
+                    </div>
+                  </Row>
+                )}
+                {selected.breakdown.jd && (
+                  <Row><Label>JD</Label>
+                    <div>
+                      {selected.breakdown.jd.score != null && <b>{selected.breakdown.jd.score}점 — </b>}
+                      {selected.breakdown.jd.evaluation}
+                    </div>
+                  </Row>
+                )}
+                {selected.breakdown.timing && (
+                  <Row><Label>발화시간</Label>
+                    <div>
+                      {selected.breakdown.timing.score != null && <b>{selected.breakdown.timing.score}점 — </b>}
+                      {selected.breakdown.timing.evaluation}
+                    </div>
+                  </Row>
+                )}
+              </>
+            )}
+
+            {/* 종합 피드백 / 점수 요약 */}
+            {(selected.finals.scoreSection || selected.finals.feedbackSection) && (
+              <>
+                <SubH>🧾 종합 피드백</SubH>
+                {selected.finals.scoreSection && (<div>{`<점수 요약>\n${selected.finals.scoreSection}`}</div>)}
+                {selected.finals.feedbackSection && (<div style={{ marginTop:12 }}>{`<종합 피드백>\n${selected.finals.feedbackSection}`}</div>)}
+              </>
+            )}
+
+            {/* 핵심 개선 액션 */}
+            {selected.finals.actionsSection && (
+              <>
+                <SubH>🛠️ 다음 면접 대비 핵심 개선 액션</SubH>
+                <div>{selected.finals.actionsSection}</div>
+              </>
+            )}
+          </ModalContent>
+        </ModalOverlay>
+      )}
     </Container>
   );
 };

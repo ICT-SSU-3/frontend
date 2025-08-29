@@ -268,7 +268,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       setLastResponse({ type: 'evaluate_answer', result: res });
       const { report_for_current_answer } = res;
       setLastEval(report_for_current_answer);
-      sendBot(`평가 요약: ${report_for_current_answer}`);
+      //sendBot(`평가 요약: ${report_for_current_answer}`);
     } catch (e: any) {
       setLastError(String(e?.message || e));
       sendBot('평가 중 오류가 발생했습니다. 다음 질문으로 넘어갈게요.');
@@ -397,23 +397,6 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
           </CountdownMessage>
         )}
 
-        <DebugBox>
-          {JSON.stringify(
-            {
-              sessionId: sessionId ?? '(pending)',
-              currentQuestionIndex: questionIndex,
-              currentQuestionId,
-              totalQuestions,
-              currentQuestion,
-              lastEvaluation: lastEval || null,
-              lastError: lastError || null,
-              lastRequest,
-              lastResponse,
-            },
-            null,
-            2
-          )}
-        </DebugBox>
 
         <EndButtonWrap>
           <EndButton primary onClick={onEndInterview}>

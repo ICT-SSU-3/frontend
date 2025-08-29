@@ -276,13 +276,6 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
           )}
         </div>
 
-        <div>
-          <DividerBottom />
-          <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>로그인하고 면접 기록 저장하기</p>
-          <StyledButton style={{ marginTop: '10px' }} onClick={onLoginClick}>
-            <span role="img" aria-label="login">👤</span> 로그인
-          </StyledButton>
-        </div>
       </Sidebar>
 
       <Content>
