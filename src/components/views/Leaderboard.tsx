@@ -1,226 +1,216 @@
-import React, { useState } from 'react';
+// src/pages/Leaderboard.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { InterviewAPI } from '../../api';
+import type { FinevalResponse } from '../../api/fineval';
 
+/* -------------------------- styles -------------------------- */
 const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; justify-content: center; align-items: center; z-index: 1000;
 `;
-
 const ModalContent = styled.div`
-  background-color: #fff;
-  padding: 30px;
-  border-radius: 10px;
-  max-width: 80%;
-  max-height: 80%;
-  overflow-y: auto;
-  line-height: 1.6;
-  text-align: left;
-  white-space: pre-wrap;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  background: #fff; padding: 28px; border-radius: 12px;
+  max-width: 900px; width: 90%; max-height: 80vh; overflow-y: auto;
+  text-align: left; line-height: 1.6; white-space: pre-wrap;
 `;
-
-const ItemWrapper = styled.div`
-  background-color: #f0f0f0;
-  border-radius: 10px;
-  padding: 15px 20px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-`;
-
 const Container = styled.div`
-  padding: 40px;
-  background-color: #ffffff;
-  text-align: center;
-  width: 90%;
-  max-width: 750px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-  font-family: 'Pretendard', sans-serif; /* 폰트 유지 */
+  padding: 40px; background: #fff; text-align: center;
+  width: 90%; max-width: 820px; margin: 40px auto;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08); border-radius: 12px;
+  font-family: 'Pretendard', sans-serif;
 `;
-
-const Header = styled.div`
-  text-align: center;
-  margin-bottom: 20px;
+const Title = styled.h2` font-size: 24px; font-weight: 700; margin: 0 0 24px; `;
+const HeaderInfo = styled.div` font-size: 15px; color: #555; margin-bottom: 20px; `;
+const ScrollArea = styled.div` max-height: 460px; overflow-y: auto; padding-right: 8px; `;
+const Row = styled.div`
+  display: grid; grid-template-columns: 1fr 100px 180px; gap: 12px;
+  align-items: stretch; margin-bottom: 12px;
 `;
-
-const Title = styled.h2`
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 40px;
+const Pill = styled.button`
+  width: 100%; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 12px 14px; text-align: left; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  &:hover { background: #eef2ff; border-color: #c7d2fe; }
 `;
-
-const HeaderInfo = styled.div`
-  font-size: 16px;
-  color: #555;
+const Box = styled.div`
+  background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; padding: 12px 14px;
 `;
-
-const Icon = styled.span`
-  margin-left: 8px;
-`;
-
-const ScrollArea = styled.div`
-  max-height: 400px; 
-  overflow-y: auto; 
-  padding-right: 15px;
-`;
-
-const ListItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: start;
-  margin-bottom: 15px;
-`;
-
-const Monos = styled.pre`
+const Mono = styled.pre`
   font-size: 12px; text-align: left; background: #f8fafc; border: 1px dashed #cbd5e1;
-  padding: 10px; border-radius: 8px; color: #334155; max-height: 200px; overflow: auto;
+  padding: 10px; border-radius: 8px; color: #334155; max-height: 220px; overflow: auto;
+`;
+const Section = styled.div` margin-bottom: 18px; `;
+const ScoreRow = styled.div`
+  display: grid; grid-template-columns: 110px 1fr; gap: 12px;
+  padding: 6px 0; border-bottom: 1px dashed #e5e7eb;
 `;
 
+/* ----------------------- helpers ----------------------- */
+function parseEval(maybeString: any): any | null {
+  if (!maybeString) return null;
+  if (typeof maybeString === 'object') return maybeString;
+  if (typeof maybeString === 'string') {
+    try {
+      return JSON.parse(maybeString);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
-const Question: React.FC<{ number: number; text: string }> = ({ number, text }) => {
-  return (
-    <ItemWrapper
-      style={{
-        height: '55px',
-        overflowY: 'auto',
-        display: 'block',
-        whiteSpace: 'normal',
-        width: '350px', 
-      }}
-    >
-      <span style={{ fontWeight: 'bold' }}>Q{number}. </span>
-      <span>{text}</span>
-    </ItemWrapper>
-  );
-};
+function firstLine(text?: string | null): string {
+  if (!text) return '';
+  const idx = text.indexOf('\n');
+  return idx === -1 ? text : text.slice(0, idx);
+}
 
-const Time: React.FC<{ time?: number }> = ({ time }) => {
-  return (
-    <ItemWrapper style={{ width: '90px', height: '55px', justifyContent: 'center' }}>
-      <span>{time}초</span>
-    </ItemWrapper>
-  );
-};
-
-const Score: React.FC<{ score?: number }> = ({ score }) => {
-  return (
-    <ItemWrapper style={{ width: '90px', height: '55px', justifyContent: 'center' }}>
-      <span>{score}점</span>
-    </ItemWrapper>
-  );
-};
-
-const Feedback: React.FC<{ text?: string }> = ({ text }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const openModal = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => setIsModalOpen(false);
-
-  return (
-    <>
-      <ItemWrapper
-        onClick={openModal}
-        style={{
-          cursor: 'pointer',
-          display: 'block',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          width: '250px', // 고정 너비
-        }}
-      >
-        <span>{text}</span>
-      </ItemWrapper>
-      {isModalOpen && (
-        <ModalOverlay onClick={closeModal}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <p>{text}</p>
-          </ModalContent>
-        </ModalOverlay>
-      )}
-    </>
-  );
-};
-
-type LBState = {
-  interview_log?: Array<{
-    question: string;
-    answer: string;
-    time_in_seconds: number;
-    evaluations?: {
-      star_evaluation?: string;
-      logic_evaluation?: string;
-      timing_evaluation?: { score: number; evaluation: string };
-    };
-    final_report?: string;
-  }>;
-  error?: string;
-  note?: string;
-  companyName?: string;
-  jobTitle?: string;
-};
+/* ------------------------- component ------------------------ */
+type LBState = (FinevalResponse & { companyName?: string; jobTitle?: string }) | undefined;
 
 const Leaderboard: React.FC = () => {
-  const { state } = useLocation() as { state?: LBState };
-  const companyName = state?.companyName ?? '';
-  const jobTitle = state?.jobTitle ?? '';
-  const rows = state?.interview_log ?? [];
+  const { state } = useLocation() as { state: LBState };
+  const [search] = useSearchParams();
+
+  const [data, setData] = useState<FinevalResponse | null>(state ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  // URL 직접 접근: /leaderboard?session_id=56
+  useEffect(() => {
+    if (data) return;
+    const sid = search.get('session_id');
+    if (!sid) return;
+    (async () => {
+      try {
+        const res = await InterviewAPI.fineval({ session_id: Number(sid) });
+        setData(res);
+      } catch (e: any) {
+        setError(String(e?.message || e));
+      }
+    })();
+  }, [data, search]);
+
+  const companyName = (state as any)?.companyName ?? data?.session.company_name ?? '';
+  const jobTitle = (state as any)?.jobTitle ?? data?.session.jd_name ?? '';
+
+  // rows: evaluation_content(문자열) → JSON 파싱한 parsedEval 포함
+  const rows = useMemo(() => {
+    if (!data?.results) return [];
+    return data.results.map(r => {
+      const parsedEval = parseEval(r.evaluation_content);
+      return {
+        question: r.question_content ?? '(질문 없음)',
+        answer: r.answer_content ?? '',
+        parsedEval, // { final_score, final_report, evaluations: { ... } } | null
+        reportFirstLine: firstLine(parsedEval?.final_report),
+      };
+    });
+  }, [data]);
 
   return (
     <Container>
-      <Header>
-        <Title>리더보드</Title>
-        <HeaderInfo>
-          <span><Icon>🏢</Icon>{companyName} / {jobTitle}</span>
-        </HeaderInfo>
-        {(state?.error || state?.note) && (
-          <div style={{ marginTop: 8, color: state?.error ? '#b91c1c' : '#4b5563' }}>
-            {state?.error ?? state?.note}
+      <Title>리더보드</Title>
+
+      <HeaderInfo>
+        <div>🏢 {companyName} / {jobTitle}</div>
+        <div>🙍 {data?.session.user_name}</div>
+        {data?.counts && (
+          <div style={{ marginTop: 6, color: '#6b7280' }}>
+            {data.counts.answered}/{data.counts.total_questions} 답변 완료
           </div>
         )}
-      </Header>
+        {error && <div style={{ marginTop: 8, color: '#b91c1c' }}>{error}</div>}
+      </HeaderInfo>
 
-      {rows.length === 0 ? (
-        <div style={{ color: '#9ca3af' }}>표시할 인터뷰 로그가 없습니다.</div>
+      {!rows.length ? (
+        <div style={{ color: '#9ca3af' }}>표시할 결과가 없습니다.</div>
       ) : (
         <ScrollArea>
-          {rows.map((item, idx) => (
-            <ListItem key={idx}>
-              <Question number={idx + 1} text={item.question} />
-              <Time time={item.time_in_seconds} />
-              <Score score={item.evaluations?.timing_evaluation?.score} />
-              <Feedback text={item.final_report} />
-            </ListItem>
+          {rows.map((r, idx) => (
+            <React.Fragment key={idx}>
+              <Row>
+                {/* 질문 1줄 */}
+                <Pill onClick={() => setOpenIdx(idx)} title={r.question}>
+                  <b>Q{idx + 1}.</b>&nbsp;{r.question}
+                </Pill>
+
+                {/* 최종 점수 */}
+                <Box title="최종 점수">
+                  {r.parsedEval?.final_score ?? '-'}점
+                </Box>
+
+                {/* 리포트 첫 줄 요약 (없으면 버튼 라벨로 대체) */}
+                <Pill onClick={() => setOpenIdx(idx)} title="상세 보기">
+                  {r.reportFirstLine || '전체 평가/답변 보기'}
+                </Pill>
+              </Row>
+
+              {openIdx === idx && (
+                <ModalOverlay onClick={() => setOpenIdx(null)}>
+                  <ModalContent onClick={(e) => e.stopPropagation()}>
+                    <h3 style={{ marginTop: 0 }}>
+                      Q{idx + 1}. {r.question}
+                    </h3>
+
+                    <Section>
+                      <h4>🗣️ 내 답변</h4>
+                      <div>{r.answer || '(답변 없음)'}</div>
+                    </Section>
+
+                    <Section>
+                      <h4>📊 세부 평가</h4>
+                      {r.parsedEval?.evaluations ? (
+                        <>
+                          <ScoreRow>
+                            <div>STAR</div>
+                            <div>
+                              {r.parsedEval.evaluations.star_evaluation?.score}점 — {r.parsedEval.evaluations.star_evaluation?.evaluation}
+                            </div>
+                          </ScoreRow>
+                          <ScoreRow>
+                            <div>논리성</div>
+                            <div>
+                              {r.parsedEval.evaluations.logic_evaluation?.score}점 — {r.parsedEval.evaluations.logic_evaluation?.evaluation}
+                            </div>
+                          </ScoreRow>
+                          <ScoreRow>
+                            <div>JD</div>
+                            <div>
+                              {r.parsedEval.evaluations.jd_evaluation?.score}점 — {r.parsedEval.evaluations.jd_evaluation?.evaluation}
+                            </div>
+                          </ScoreRow>
+                          <ScoreRow>
+                            <div>발화시간</div>
+                            <div>
+                              {r.parsedEval.evaluations.timing_evaluation?.score}점 — {r.parsedEval.evaluations.timing_evaluation?.evaluation}
+                            </div>
+                          </ScoreRow>
+                        </>
+                      ) : (
+                        <div>세부 평가 없음</div>
+                      )}
+                    </Section>
+
+                    <Section>
+                      <h4>📝 종합 피드백</h4>
+                      <div>{r.parsedEval?.final_report || '(없음)'}</div>
+                    </Section>
+                  </ModalContent>
+                </ModalOverlay>
+              )}
+            </React.Fragment>
           ))}
         </ScrollArea>
       )}
 
+      {/* 디버그 원본 */}
       <div style={{ marginTop: 20, textAlign: 'left' }}>
-        <h4 style={{ margin: '10px 0' }}>Raw interview_log (debug)</h4>
-        <Monos>{JSON.stringify(rows, null, 2)}</Monos>
+        <h4 style={{ margin: '10px 0' }}>Raw fineval (debug)</h4>
+        <Mono>{JSON.stringify(data, null, 2)}</Mono>
       </div>
     </Container>
   );
