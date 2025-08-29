@@ -208,7 +208,11 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       if (e?.detail && e.detail.includes('범위를 벗어났습니다')) {
         sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
       } else {
-        sendBot('질문을 가져오는 데 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        // ⭐ 수정된 부분: 에러 발생 시 URL과 에러 응답을 메시지로 보냄
+        const errorUrl = `${process.env.REACT_APP_API_BASE_URL}/api/question/?session_id=${sessionId}&index=${nextIndex}`;
+        const errorMessage = `질문 API 호출에 실패했습니다.\n\nURL: ${errorUrl}\n에러: ${e.message}`;
+        sendBot(errorMessage);
+        console.error('질문 API 오류:', e);
       }
     }
   };
