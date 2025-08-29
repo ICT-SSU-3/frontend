@@ -1,7 +1,7 @@
 // src/api/question.ts
 
-// API_BASE_URL은 환경 변수에서 가져옵니다.
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+// API_BASE_URL은 더 이상 사용하지 않습니다.
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export interface GetQuestionRequest {
   session_id: number;
@@ -18,21 +18,13 @@ export interface GetQuestionResponse {
 }
 
 export async function getQuestion(req: GetQuestionRequest): Promise<GetQuestionResponse> {
-  if (!API_BASE_URL) {
-    throw new Error('API Base URL이 환경 변수에 정의되지 않았습니다.');
-  }
-
-  // URLSearchParams를 사용하여 파라미터를 안전하게 인코딩합니다.
   const params = new URLSearchParams({
-    session_id: req.session_id.toString(), // number를 string으로 변환
-    index: req.index.toString(), // number를 string으로 변환
+    session_id: req.session_id.toString(),
+    index: req.index.toString(),
   });
 
-  // 절대 URL 사용
-  const url = `${API_BASE_URL}/api/question/?${params.toString()}`;
-
-  // URL을 확인하기 위해 alert 추가
-  alert(url);
+  // ✅ resumeFull.ts와 동일하게 상대 경로를 사용하도록 수정
+  const url = `/api/question/?${params.toString()}`;
 
   const res = await fetch(url, {
     method: 'GET',
