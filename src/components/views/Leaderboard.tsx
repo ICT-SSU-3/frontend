@@ -59,10 +59,16 @@ const Pill = styled.div`
 const QuestionPill = styled(Pill)`height:50px; overflow:auto; text-align:left;`;
 const ScorePill = styled(Pill)`text-align:center;`;
 const FeedbackButton = styled(Pill)`
-  cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left;
+  cursor:pointer;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center; /* 이 부분을 center로 수정 */
+  display: flex; /* Flexbox 활성화 */
+  justify-content: center; /* 가로 중앙 정렬 */
+  align-items: center; /* 세로 중앙 정렬 */
   &:hover{ background:#eef2ff; border-color:#dbeafe; }
 `;
-
 const H = styled.h3`margin:20px 0 10px; font-size:20px; font-weight:800;`;
 const SubH = styled.h4`margin:14px 0 10px; font-size:16px; font-weight:800; display:flex; gap:8px; align-items:center;`;
 
@@ -110,37 +116,54 @@ function firstLine(s?: string) {
 }
 
 // final_report splitter
+// ✅ REPLACE ONLY THIS FUNCTION
+// final_report splitter — 오직 "## 점수 요약" / "## 종합 피드백" 두 섹션만 파싱
 function splitReportSections(report: string) {
-  const text = normalize(report);
-  const SCORE = /(\*\*?\s*)?<\s*점수\s*요약\s*>\s*(\*\*)?/i;
-  const FEEDBACK = /(\*\*?\s*)?<\s*종합\s*피드백\s*>\s*(\*\*)?/i;
-  const ACTIONS = new RegExp(
-    [
-      '(\\*\\*?\\s*)?<\\s*다음\\s*면접\\s*대비\\s*핵심\\s*개선\\s*액션\\s*>\\s*(\\*\\*)?',
-      '(\\*\\*?\\s*)?<\\s*핵심\\s*개선\\s*액션\\s*>\\s*(\\*\\*)?',
-      '다음\\s*면접\\s*대비\\s*핵심\\s*개선\\s*액션\\s*:',
-      '핵심\\s*개선\\s*액션\\s*:'
-    ].join('|'), 'i'
-  );
-  const nexts = [SCORE, FEEDBACK, ACTIONS, /^##\s+/im];
+  const text = normalize(report || "");
 
-  const pick = (start: RegExp, stops: RegExp[]) => {
-    const m = text.match(start); if (!m) return '';
-    const s = (m.index ?? 0) + m[0].length;
-    let e = text.length;
-    for (const r of stops) {
-      const n = text.slice(s).match(r);
-      if (n) e = Math.min(e, s + (n.index ?? 0));
-    }
-    return normalize(text.slice(s, e));
+  // 헤더 라인 (정확히 H2 형식만 처리)
+  const SCORE_H = /^##\s*점수\s*요약\s*$/gmi;
+  const FEED_H  = /^##\s*종합\s*피드백\s*$/gmi;
+
+  // 모든 헤더 위치 수집
+  type Hit = { key: "score" | "feedback"; start: number; end: number };
+  const hits: Hit[] = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = SCORE_H.exec(text)) !== null) {
+    hits.push({ key: "score", start: m.index, end: m.index + m[0].length });
+  }
+  while ((m = FEED_H.exec(text)) !== null) {
+    hits.push({ key: "feedback", start: m.index, end: m.index + m[0].length });
+  }
+
+  // 시작 위치 기준 정렬
+  hits.sort((a, b) => a.start - b.start);
+
+  const bodyBetween = (from: number, to?: number) => {
+    const s = from;
+    const e = Number.isFinite(to as number) ? (to as number) : text.length;
+    return normalize(text.slice(s, e).replace(/^\r?\n/, "")); // 헤더 바로 다음 개행 제거
   };
 
-  const score = pick(SCORE, [FEEDBACK, ACTIONS, /^##\s+/im]);
-  const feedback = pick(FEEDBACK, [ACTIONS, /^##\s+/im]);
-  const actions = pick(ACTIONS, [/^##\s+/im]);
+  let score = "";
+  let feedback = "";
+
+  for (let i = 0; i < hits.length; i++) {
+    const cur = hits[i];
+    const next = hits[i + 1];
+    const body = bodyBetween(cur.end, next?.start);
+    if (cur.key === "score") score = body;
+    else if (cur.key === "feedback") feedback = body;
+  }
+
+  // 외부 로직 호환용: 액션은 사용 안 함(빈 값 반환)
+  const actions = "";
+  const ACTIONS = /$^/i; // 어떤 것도 매치되지 않게
 
   return { score, feedback, actions, ACTIONS };
 }
+
 
 const Leaderboard: React.FC = () => {
   const { state } = useLocation() as { state?: FinevalState };
@@ -207,7 +230,7 @@ const Leaderboard: React.FC = () => {
               <QuestionPill><b>Q{r.idx}. </b>{r.question}</QuestionPill>
               <ScorePill>{r.finals.finalScore ?? '-'}점</ScorePill>
               <FeedbackButton onClick={() => setSelected(r)} title="클릭해서 전체 보기">
-                {r.finals.summaryLine}
+                세부평가 확인하기🫵
               </FeedbackButton>
             </ListItem>
           ))}
