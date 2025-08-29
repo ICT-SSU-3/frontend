@@ -15,7 +15,7 @@ const FileInputLabel = styled.label`
   cursor: pointer; margin-bottom: 20px; font-size: 16px; color: #999;
 `;
 const FileInput = styled.input` display: none; `;
-const DropdownWrapper = styled.div` margin-bottom: 20px; `;
+
 
 interface InterviewInfoModalProps {
   isOpen: boolean;
@@ -32,18 +32,6 @@ interface InterviewInfoModalProps {
   }) => void;
 }
 
-const MaskedTextDisplay = styled.pre`
-  background-color: #f3f4f6;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  white-space: pre-wrap;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: #374151;
-  max-height: 200px;
-  overflow-y: auto;
-`;
 
 const ErrorDisplay = styled.div`
   background-color: #fee2e2;
@@ -56,16 +44,6 @@ const ErrorDisplay = styled.div`
   font-weight: bold;
 `;
 
-const QuestionDisplay = styled.div`
-  background-color: #e2f2ff;
-  border: 1px solid #90caf9;
-  color: #1a237e;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  font-size: 1rem;
-  line-height: 1.5;
-`;
 
 const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
   isOpen,
@@ -192,16 +170,7 @@ const InterviewInfoModal: React.FC<InterviewInfoModalProps> = ({
 
       {error && <ErrorDisplay>{error}</ErrorDisplay>}
       
-      {maskedText && (
-        <>
-          <h4 style={{ marginTop: 16 }}>마스킹 텍스트(요약):</h4>
-          <MaskedTextDisplay>{maskedText.slice(0, 1200)}</MaskedTextDisplay>
-        </>
-      )}
 
-      {fullResumeData && fullResumeData.questions[0] && (
-        <QuestionDisplay>{fullResumeData.questions[0].question_content}</QuestionDisplay>
-      )}
     </Modal>
   );
 };

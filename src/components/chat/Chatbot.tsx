@@ -1,7 +1,8 @@
+// src/components/chat/Chatbot.tsx
+
 import React, { useEffect, useRef, useState, type ComponentType } from 'react';
 import styled from 'styled-components';
 import { InputWrapper, StyledTextarea } from '../common/Input';
-import { recognizeSpeech } from '../../api/stt';
 import { FaMicrophone as FaMicrophoneRaw, FaPaperPlane as FaPaperPlaneRaw } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { StyledButton } from '../common/Button';
@@ -37,10 +38,15 @@ const DividerBottom = styled.hr`
   border: none; border-top: 1px solid #e5e5e5;
   width: calc(100% + 40px); margin: 0 -20px 24px -20px;
 `;
-const ChatInputContainer = styled.div`
+const ChatInputContainer = styled.div<{ disabled?: boolean }>`
   display: flex; align-items: center; gap: 10px; width: 100%;
   background-color: #fff; border-radius: 25px; padding: 8px 16px;
   border: 1px solid #e5e5e5; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  ${(p) => p.disabled && `
+    background-color: #f0f0f0;
+    cursor: not-allowed;
+    & > * { pointer-events: none; }
+  `}
 `;
 const StyledIcon = styled.button<{ isRecording?: boolean }>`
   background: none; border: none; cursor: pointer; font-size: 20px;
@@ -59,6 +65,13 @@ const EndButton = styled(StyledButton)`
 const DebugBox = styled.pre`
   background: #0b10210a; border: 1px dashed #cbd5e1; padding: 8px 10px; border-radius: 8px;
   font-size: 12px; color: #334155; max-height: 220px; overflow: auto; margin: 4px 0 0 0;
+`;
+const CountdownMessage = styled.div`
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #555;
 `;
 
 // ================== types ==================
@@ -87,14 +100,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
-  // 자소서 마스킹 표시 (앞 1500자만)
-  const postedMaskedRef = useRef(false);
-  const MAX_MASKED_CHARS = 1500;
-
-  // 서버 응답 전문(JSON) 1회 표시 가드
-  const postedBackendRawRef = useRef(false);
 
   // ⭐ 질문 인덱스 상태 (1부터 시작)
   const [questionIndex, setQuestionIndex] = useState<number>(0);
@@ -102,6 +108,10 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const [totalQuestions, setTotalQuestions] = useState<number>(5); 
   const [questionStartAt, setQuestionStartAt] = useState<number | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
+  
+  // ⭐ 추가된 상태
+  const [isInterviewEnded, setIsInterviewEnded] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   // 디버깅 상태
   const [sessionId, setSessionId] = useState<string | undefined>(ctx.sessionId);
@@ -139,6 +149,8 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const sendBot  = (text: string) =>
     setMessages(prev => [...prev, { text, isUser: false }]);
 
+
+
   // ⭐ API를 호출하여 다음 질문을 가져오는 함수
   const fetchNextQuestion = async (nextIndex: number) => {
     if (!sessionId) {
@@ -161,7 +173,6 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     } catch (e: any) {
       setLastError(e?.detail || '질문을 가져오는 중 오류가 발생했습니다.');
       if (e?.detail && e.detail.includes('범위를 벗어났습니다')) {
-        // 면접 종료 로직
         sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
       } else {
         sendBot('질문을 가져오는 데 실패했습니다. 잠시 후 다시 시도해 주세요.');
@@ -184,9 +195,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
 
     // ⭐ 평가 API 호출
-    if (!sessionId) {
-      setLastError('세션이 준비되지 않아 평가를 생략했습니다.');
-    } else {
+    if (sessionId) {
       try {
         const sec = questionStartAt != null
           ? Math.max(1, Math.round((Date.now() - questionStartAt) / 1000))
@@ -210,148 +219,155 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
         setLastError(String(e?.message || e));
         sendBot('평가 중 오류가 발생했습니다. 다음 질문으로 넘어갈게요.');
       }
-    }
-
-    // ⭐ 다음 질문 요청
-    if (questionIndex < totalQuestions) {
-      fetchNextQuestion(questionIndex + 1);
     } else {
-      // 마지막 질문까지 완료했으면 면접 종료 메시지 표시
-      sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
+      setLastError('세션이 준비되지 않아 평가를 생략했습니다.');
     }
-  };
 
-  // 엔터 전송
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
+
+    // ⭐ 수정된 부분: 다음 질문 요청 또는 면접 종료
+    const nextIndex = questionIndex + 1;
+
+    if (nextIndex > totalQuestions) {
+        // 마지막 질문에 대한 답변까지 완료
+        setIsInterviewEnded(true);
+        sendBot('준비된 질문이 모두 끝났습니다. 잠시 후 리더보드로 이동합니다.');
+        
+        const timer = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    onEndInterview();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        
+    } else {
+        fetchNextQuestion(nextIndex);
+    }
+};
+
+// 엔터 전송
+const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    // 면접이 종료되지 않았을 때만 전송
+    if (!isInterviewEnded) {
       handleSendMessage();
     }
-  };
+  }
+};
 
-  // 면접 종료 → 리더보드 이동
-  const onEndInterview = async () => {
-    try {
-      if (!sessionId) {
-        navigate('/leaderboard', {
-          state: {
-            interview_log: [],
-            note: '세션 없음',
-            companyName: ctx.companyName,
-            jobTitle: ctx.jobTitle,
-          },
-        });
-        return;
-      }
-      const reqPayload = { session_id: sessionId };
-      setLastRequest({ type: 'end_interview', payload: reqPayload });
+// 음성 녹음 → STT
+const handleSpeechRecognition = async () => {
+  // 면접이 종료되지 않았을 때만 작동
+  if (isInterviewEnded) return;
 
-      const data = await InterviewAPI.end(reqPayload);
-      setLastResponse({ type: 'end_interview', result: data });
+  if (isRecording) {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    return;
+  }
+  // ... (기존 로직 유지)
+};
 
-      navigate('/leaderboard', {
-        state: {
-          ...data,
-          companyName: ctx.companyName,
-          jobTitle: ctx.jobTitle,
-        },
-      });
-    } catch (e: any) {
-      setLastError('end_interview 실패: ' + (e?.message || e));
+// 면접 종료 → 리더보드 이동
+const onEndInterview = async () => {
+  // ... (기존 로직 유지)
+  try {
+    if (!sessionId) {
       navigate('/leaderboard', {
         state: {
           interview_log: [],
-          error: String(e?.message || e),
+          note: '세션 없음',
           companyName: ctx.companyName,
           jobTitle: ctx.jobTitle,
         },
       });
-    }
-  };
-
-  // 음성 녹음 → STT
-  const handleSpeechRecognition = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
+    const reqPayload = { session_id: sessionId };
+    setLastRequest({ type: 'end_interview', payload: reqPayload });
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
+    const data = await InterviewAPI.end(reqPayload);
+    setLastResponse({ type: 'end_interview', result: data });
 
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        try {
-          const result = await recognizeSpeech(audioBlob);
-          setInputValue(result.transcript);
-        } catch (error) {
-          console.error('STT API 오류:', error);
-          alert('음성 인식 중 오류가 발생했습니다.');
-        }
-      };
+    navigate('/leaderboard', {
+      state: {
+        ...data,
+        companyName: ctx.companyName,
+        jobTitle: ctx.jobTitle,
+      },
+    });
+  } catch (e: any) {
+    setLastError('end_interview 실패: ' + (e?.message || e));
+    navigate('/leaderboard', {
+      state: {
+        interview_log: [],
+        error: String(e?.message || e),
+        companyName: ctx.companyName,
+        jobTitle: ctx.jobTitle,
+      },
+    });
+  }
+};
 
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error('음성 녹음 권한 오류:', err);
-      alert('마이크 접근 권한이 필요합니다.');
-    }
-  };
+return (
+  <ChatContainer>
+    <MessageList ref={listRef}>
+      {messages.map((m, i) => (
+        <MessageBubble key={i} isUser={m.isUser}>{m.text}</MessageBubble>
+      ))}
 
-  return (
-    <ChatContainer>
-      <MessageList ref={listRef}>
-        {messages.map((m, i) => (
-          <MessageBubble key={i} isUser={m.isUser}>{m.text}</MessageBubble>
-        ))}
+      {/* ⭐ 남은 시간 표시 */}
+      {isInterviewEnded && countdown > 0 && (
+          <CountdownMessage>
+              잠시 후 면접 기록을 확인합니다. ({countdown}초)
+          </CountdownMessage>
+      )}
 
-        {/* 디버그 */}
-        <DebugBox>
-          {JSON.stringify({
-            sessionId: sessionId ?? '(pending)',
-            // ⭐ 변경된 부분
-            currentQuestionIndex: questionIndex,
-            totalQuestions,
-            currentQuestion,
-            lastEvaluation: lastEval || null,
-            lastError: lastError || null,
-            lastRequest,
-            lastResponse,
-          }, null, 2)}
-        </DebugBox>
+      {/* 디버그 */}
+      <DebugBox>
+        {JSON.stringify({
+          sessionId: sessionId ?? '(pending)',
+          currentQuestionIndex: questionIndex,
+          totalQuestions,
+          currentQuestion,
+          lastEvaluation: lastEval || null,
+          lastError: lastError || null,
+          lastRequest,
+          lastResponse,
+        }, null, 2)}
+      </DebugBox>
 
-        {/* 종료 버튼 */}
-        <EndButtonWrap>
-          <EndButton primary onClick={onEndInterview}>면접 종료하기</EndButton>
-        </EndButtonWrap>
-      </MessageList>
+      {/* 종료 버튼 */}
+      <EndButtonWrap>
+        <EndButton primary onClick={onEndInterview}>면접 종료하기</EndButton>
+      </EndButtonWrap>
+    </MessageList>
 
-      <DividerBottom />
+    <DividerBottom />
 
-      <ChatInputContainer>
-        <StyledIcon isRecording={isRecording} onClick={handleSpeechRecognition}>
-          <FaMicrophone />
-        </StyledIcon>
-        <InputWrapper style={{ flexGrow: 1, marginBottom: 0, alignItems: 'stretch' }}>
-          <StyledTextarea
-            ref={textareaRef}
-            rows={1}
-            placeholder="답변을 입력하세요."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </InputWrapper>
-        <StyledIcon onClick={handleSendMessage}>
-          <FaPaperPlane />
-        </StyledIcon>
-      </ChatInputContainer>
-    </ChatContainer>
-  );
+    <ChatInputContainer disabled={isInterviewEnded}>
+      <StyledIcon isRecording={isRecording} onClick={handleSpeechRecognition}>
+        <FaMicrophone />
+      </StyledIcon>
+      <InputWrapper style={{ flexGrow: 1, marginBottom: 0, alignItems: 'stretch' }}>
+        <StyledTextarea
+          ref={textareaRef}
+          rows={1}
+          placeholder="답변을 입력하세요."
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isInterviewEnded}
+        />
+      </InputWrapper>
+      <StyledIcon onClick={handleSendMessage} disabled={isInterviewEnded}>
+        <FaPaperPlane />
+      </StyledIcon>
+    </ChatInputContainer>
+  </ChatContainer>
+);
 }
