@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { StyledButton } from '../common/Button';
 import Chatbot from '../chat/Chatbot';
-import { InterviewAPI } from '../../api';
 import { resumeFull, ResumeFullResponse } from '../../api/resumeFull';
 
 const PageContainer = styled.div`
@@ -134,7 +133,7 @@ type Session = {
   maskedText?: string;   
   sessionId?: string;
   backendQuestions?: string[];
-  backendRaw?: ResumeFullResponse; // 응답 전문 전체를 보관
+  backendRaw?: ResumeFullResponse; 
 };
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -144,7 +143,7 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
   const [activeId, setActiveId] = useState<string | null>(null);
   const lastAddedKey = useRef<string | null>(null);
 
-  // 새 면접이 들어오면 최신을 위로 추가
+  //로그인 기능 구현 시, 채팅 저장 예쩡
   useEffect(() => {
     if (!interviewData) return;
     const key = `${interviewData.companyName}|${interviewData.jobTitle}|${interviewData.userName}`;
@@ -157,12 +156,12 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
       userName: String(interviewData.userName ?? ''),
       maskedText: interviewData.maskedText,
       createdAt: Date.now(),
-      // ⭐️ resumeFullData에서 sessionId와 질문 목록을 바로 가져와 저장
+
       sessionId: interviewData.fullResumeData.session_id,
       backendQuestions: interviewData.fullResumeData.questions?.map(q => q.question_content),
       backendRaw: interviewData.fullResumeData,
     };
-    setSessions(prev => [s, ...prev]); // 최신 위
+    setSessions(prev => [s, ...prev]); 
     setActiveId(s.id);
     lastAddedKey.current = key;
   }, [interviewData]);
@@ -171,65 +170,7 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
     () => sessions.find(s => s.id === activeId) ?? null,
     [sessions, activeId]
   );
-  
-  // ⭐️ resumeFull 중복 호출 로직을 제거
-  /*
-  useEffect(() => {
-  if (!activeSession) return;
-  // 이미 받아왔으면 패스
-  if (activeSession.sessionId && activeSession.backendRaw) return;
 
-  (async () => {
-    try {
-      const payload = {
-        user_name: activeSession.userName,
-        company_name: activeSession.companyName,
-        jd_name: activeSession.jobTitle,
-        resume_text: activeSession.maskedText || '', // 마스킹된 자소서 사용
-      };
-      const res = await resumeFull(payload);
-
-      setSessions(prev =>
-        prev.map(x =>
-          x.id === activeSession.id
-            ? {
-                ...x,
-                sessionId: res.session_id,
-                backendQuestions: (res.questions || []).map(q => q.question_content),
-                backendRaw: res, // 응답 전문
-              }
-            : x
-        )
-      );
-    } catch (e) {
-      console.error('resume_full 실패:', e);
-      // 실패해도 UI는 유지 (나중에 재시도 가능)
-    }
-  })();
-  }, [activeSession?.id]);
-  */
-
-  // ⭐ start_interview API 호출 로직 제거
-  /*
-  useEffect(() => {
-    if (!activeSession || activeSession.sessionId) return;
-    (async () => {
-      try {
-        const { session_id } = await InterviewAPI.start({
-          company: activeSession.companyName,
-          role: activeSession.jobTitle,
-          user_name: activeSession.userName,
-          resume_masked_text: activeSession.maskedText,
-        });
-        setSessions(prev =>
-          prev.map(x => (x.id === activeSession.id ? { ...x, sessionId: session_id } : x))
-        );
-      } catch (e) {
-        console.error('start_interview 실패:', e);
-      }
-    })();
-  }, [activeSession?.id]);
-  */
   const sessionsForView = useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
     [sessions]
@@ -289,7 +230,7 @@ const MainView: React.FC<MainViewProps> = ({ onNewInterviewClick, onLoginClick, 
               userName: activeSession.userName,
               maskedText: activeSession.maskedText || '',
               backendQuestions: activeSession.backendQuestions || [],
-              backendRaw: activeSession.backendRaw, // ★ 응답 전문
+              backendRaw: activeSession.backendRaw, 
             }}
           />
         ) : (

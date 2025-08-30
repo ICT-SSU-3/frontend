@@ -1,6 +1,3 @@
-// src/api/stt.ts
-
-// ❌ API_BASE_URL 제거
 // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 interface RecognizeResponse {
@@ -19,7 +16,7 @@ export const recognizeSpeech = async (file: Blob, language: string = 'ko-KR'): P
   formData.append('file', file, 'audio.webm'); 
   formData.append('language', language);
 
-  // ✅ 절대 URL → 상대경로
+
   const response = await fetch('/api/stt/google/recognize', {
     method: 'POST',
     body: formData,

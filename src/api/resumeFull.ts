@@ -1,6 +1,3 @@
-// src/api/resumeFull.ts
-
-// ❌ API_BASE_URL 제거
 // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export interface ResumeFullRequest {
@@ -26,7 +23,7 @@ export interface ResumeFullResponse {
 }
 
 export async function resumeFull(req: ResumeFullRequest): Promise<ResumeFullResponse> {
-  // ✅ 절대 URL → 상대경로
+
   const res = await fetch('/api/resume/full', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

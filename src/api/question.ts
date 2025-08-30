@@ -1,6 +1,3 @@
-// src/api/question.ts
-
-// API_BASE_URL은 더 이상 사용하지 않습니다.
 // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export interface GetQuestionRequest {
@@ -23,7 +20,7 @@ export async function getQuestion(req: GetQuestionRequest): Promise<GetQuestionR
     index: req.index.toString(),
   });
 
-  // ✅ resumeFull.ts와 동일하게 상대 경로를 사용하도록 수정
+
   const url = `/api/question/?${params.toString()}`;
 
   const res = await fetch(url, {

@@ -8,11 +8,11 @@ import { StyledButton } from '../common/Button';
 import { InterviewAPI } from '../../api';
 import { FinevalResponse } from '../../api/fineval';
 
-// 아이콘 타입 단언
+// 아이콘
 const FaMicrophone = FaMicrophoneRaw as ComponentType;
 const FaPaperPlane = FaPaperPlaneRaw as ComponentType;
 
-// ================== styles ==================
+
 const ChatContainer = styled.div`
   display: flex; flex-direction: column;
   height: 100%; width: 100%;
@@ -102,7 +102,7 @@ const CountdownMessage = styled.div`
   color: #555;
 `;
 
-// ================== types ==================
+
 interface ChatbotProps {
   initialMessage: string;
   ctx: {
@@ -120,11 +120,11 @@ interface Message {
   isUser: boolean;
 }
 
-// ================== component ==================
+
 export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const navigate = useNavigate();
 
-  // 자소서/초기 메시지
+
   const [messages, setMessages] = useState<Message[]>([
     { text: initialMessage, isUser: false },
   ]);
@@ -133,14 +133,14 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // ⭐ 질문 인덱스 상태 (1부터 시작)
+  // 질문 인덱스
   const [questionIndex, setQuestionIndex] = useState<number>(0);
-  // ⭐ 총 질문 개수 상태
+
   const [totalQuestions, setTotalQuestions] = useState<number>(5);
   const [questionStartAt, setQuestionStartAt] = useState<number | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
-  // ⭐ question_id 상태 추가
+
   const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(
     null
   );
@@ -153,7 +153,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
   const [lastRequest, setLastRequest] = useState<any>(null);
   const [lastResponse, setLastResponse] = useState<any>(null);
 
-  // textarea 높이 자동
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -162,7 +162,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [inputValue]);
 
-  // 스크롤 하단 유지
+
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (listRef.current) {
@@ -170,20 +170,19 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   }, [messages]);
 
-  // 세션 갱신
+
   useEffect(() => {
     if (ctx.sessionId && ctx.sessionId !== sessionId)
       setSessionId(ctx.sessionId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.sessionId]);
 
-  // 유틸: 메시지 추가
+
   const sendUser = (text: string) =>
     setMessages((prev) => [...prev, { text, isUser: true }]);
   const sendBot = (text: string) =>
     setMessages((prev) => [...prev, { text, isUser: false }]);
 
-  // API를 호출하여 다음 질문을 가져오는 함수
+  //세션 에러처리
   const fetchNextQuestion = async (nextIndex: number) => {
     if (!sessionId) {
       setLastError('세션이 준비되지 않았습니다.');
@@ -198,7 +197,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
 
       setTotalQuestions(res.total);
       setCurrentQuestion(res.question_content);
-      // ⭐ API 응답에서 받은 question_id를 상태에 저장
+
       setCurrentQuestionId(res.question_id);
       sendBot(res.question_content);
       setQuestionStartAt(Date.now());
@@ -208,7 +207,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       if (e?.detail && e.detail.includes('범위를 벗어났습니다')) {
         sendBot('준비된 질문이 모두 끝났습니다. 면접을 종료하고 결과를 확인하세요.');
       } else {
-        // ⭐ 수정된 부분: 에러 발생 시 URL과 에러 응답을 메시지로 보냄
+
         const errorUrl = `${process.env.REACT_APP_API_BASE_URL}/api/question/?session_id=${sessionId}&index=${nextIndex}`;
         const errorMessage = `질문 API 호출에 실패했습니다.\n\nURL: ${errorUrl}\n에러: ${e.message}`;
         sendBot(errorMessage);
@@ -225,7 +224,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     sendUser(text);
     setInputValue('');
 
-    // 첫 메시지 (자기소개) 답이 오면 1번 질문 시작
+    // 지가 소개 답이 오면 1번 질문 시작
     if (questionIndex === 0) {
       fetchNextQuestion(1);
       return;
@@ -259,7 +258,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
           ? Math.max(1, Math.round((Date.now() - questionStartAt) / 1000))
           : 0;
 
-      // ⭐ 수정된 부분: EvalReq 타입에 맞게 reqPayload 객체 구성
+
       const reqPayload = {
         session_id: Number(sessionId),
         question_id: currentQuestionId,
@@ -272,7 +271,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
       setLastResponse({ type: 'evaluate_answer', result: res });
       const { report_for_current_answer } = res;
       setLastEval(report_for_current_answer);
-      //sendBot(`평가 요약: ${report_for_current_answer}`);
+      //sendBot(`평가 요약: ${report_for_current_answer}`); //디버깅
     } catch (e: any) {
       setLastError(String(e?.message || e));
       sendBot('평가 중 오류가 발생했습니다. 다음 질문으로 넘어갈게요.');
@@ -299,7 +298,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
-  // 엔터 전송
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -309,7 +308,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
-  // 음성 녹음 → STT
+  //STT
   const handleSpeechRecognition = async () => {
     if (isInterviewEnded) return;
 
@@ -347,7 +346,7 @@ export default function Chatbot({ initialMessage, ctx }: ChatbotProps) {
     }
   };
 
-  // 면접 종료 → 리더보드 이동
+  // 면접 종료 -> 리더보드 이동
   const onEndInterview = async () => {
     try {
       if (!sessionId) {

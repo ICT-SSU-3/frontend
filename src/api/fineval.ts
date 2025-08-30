@@ -1,6 +1,3 @@
-// src/api/fineval.ts
-
-// ❌ BASE_URL 제거
 // const BASE = process.env.REACT_APP_API_BASE_URL;
 
 export type FinevalRequest = {
@@ -33,7 +30,7 @@ export async function fineval(payload: FinevalRequest): Promise<FinevalResponse>
     session_id: payload.session_id.toString(),
   });
 
-  // ✅ BASE_URL 제거하고 절대 URL → 상대경로
+
   const url = `/api/fineval?${params.toString()}`;
 
   const res = await fetch(url, {

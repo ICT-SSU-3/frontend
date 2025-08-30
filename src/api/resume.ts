@@ -1,6 +1,3 @@
-// src/api/resume.ts
-
-// ❌ API_BASE_URL 제거
 // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 interface MaskingResponse {
@@ -19,7 +16,6 @@ export const maskResume = async (file: File, targetName: string): Promise<Maskin
   formData.append('file', file);
   formData.append('target_name', targetName);
 
-  // ✅ 절대 URL → 상대경로
   const response = await fetch('/api/resume/mask', {
     method: 'POST',
     body: formData,

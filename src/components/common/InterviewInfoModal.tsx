@@ -27,7 +27,6 @@ interface InterviewInfoModalProps {
     pdfFile: File | null;
     maskedText: string;
     initialQuestion: string;
-    // ⭐ resumeFull API 응답 전체를 전달
     fullResumeData: ResumeFullResponse; 
   }) => void;
 }

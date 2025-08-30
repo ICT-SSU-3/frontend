@@ -1,10 +1,7 @@
-// src/api/index.ts
-
 import { getQuestion, GetQuestionRequest, GetQuestionResponse } from './question';
 import { resumeFull, ResumeFullRequest, ResumeFullResponse } from './resumeFull';
-import { fineval, FinevalRequest, FinevalResponse } from './fineval';
+import { FinevalRequest, FinevalResponse } from './fineval';
 
-// ❌ BASE 제거
 // const BASE = process.env.REACT_APP_API_BASE_URL;
 
 type EvalReq = {
@@ -16,7 +13,7 @@ type EvalReq = {
 type EvalRes = { report_for_current_answer: string };
 
 async function postJSON<T>(path: string, body?: unknown): Promise<T> {
-  // ✅ BASE 제거하고 path만 사용
+
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
